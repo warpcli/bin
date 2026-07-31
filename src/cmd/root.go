@@ -175,6 +175,7 @@ func newRootCmd(version string, exit func(int)) *rootCmd {
 		newPruneCmd().cmd,
 		newTagCmd().cmd,
 		newDescribeCmd().cmd,
+		newAICmd().cmd,
 		newTuiCmd().cmd,
 	)
 

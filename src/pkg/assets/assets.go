@@ -6,16 +6,18 @@ import (
 	"compress/bzip2"
 	"compress/gzip"
 	"debug/elf"
-	"debug/macho"
 	"debug/pe"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 
+	"github.com/bresilla/bin/src/pkg/ai"
 	"github.com/bresilla/bin/src/pkg/config"
 	"github.com/bresilla/bin/src/pkg/options"
 	bstrings "github.com/bresilla/bin/src/pkg/strings"
@@ -32,7 +34,126 @@ import (
 var (
 	msiType = filetype.AddType("msi", "application/octet-stream")
 	ascType = filetype.AddType("asc", "text/plain")
+
+	aiEngine *ai.Engine
+	aiOnce   sync.Once
 )
+
+// AIModelDir returns the directory holding the learned asset-selection model,
+// or "" when learning is disabled or no state directory could be resolved. The
+// model is state bin learns rather than user config, so it lives beside the
+// state file — in system mode that keeps it out of /etc.
+func AIModelDir() string {
+	if aiDisabled() {
+		return ""
+	}
+	dir := config.StateDir()
+	if dir == "" {
+		return ""
+	}
+	return filepath.Join(dir, "ai")
+}
+
+// aiDisabled reports whether BIN_NO_AI opts out of asset-selection learning.
+func aiDisabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("BIN_NO_AI"))) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
+}
+
+// getAIEngine returns the process-wide engine, or nil when asset learning is
+// disabled or no model directory could be resolved.
+func getAIEngine() *ai.Engine {
+	aiOnce.Do(func() {
+		dir := AIModelDir()
+		if dir == "" {
+			log.Debugf("Asset-selection learning is disabled")
+			return
+		}
+		e := ai.NewEngine()
+		if err := e.Load(dir); err != nil {
+			log.Debugf("No usable asset-selection model in %s (%v); starting fresh", dir, err)
+		} else {
+			log.Debugf("Loaded asset-selection model from %s (%d selections)", dir, e.Selections())
+		}
+		aiEngine = e
+	})
+	return aiEngine
+}
+
+// aiEngineFor resolves the engine used for tie-breaking. Tests replace it so
+// they never read or write the user's real model.
+var aiEngineFor = getAIEngine
+
+// aiPick asks the learned model to break a tie between candidates the
+// deterministic scorer rated equally. It returns nil whenever the model isn't
+// confident enough, leaving the prompt — and the training signal it produces —
+// in place.
+func aiPick(repoName string, matches []*FilteredAsset) *FilteredAsset {
+	engine := aiEngineFor()
+	if engine == nil || !engine.Trained() {
+		return nil
+	}
+
+	names := make([]string, 0, len(matches))
+	for _, m := range matches {
+		names = append(names, m.Name)
+	}
+	sort.Strings(names)
+
+	best, ok := engine.Decide(names, repoName)
+	if !ok {
+		return nil
+	}
+	for _, m := range matches {
+		if m.Name == best {
+			return m
+		}
+	}
+	return nil
+}
+
+// aiBasis describes what an automatic choice was based on, so the message
+// doesn't credit the user for a decision the built-in defaults made.
+func aiBasis() string {
+	engine := aiEngineFor()
+	if engine == nil {
+		return ""
+	}
+	switch n := engine.Selections(); {
+	case n == 0:
+		return "using bin's built-in defaults"
+	case engine.Seeded():
+		return fmt.Sprintf("using bin's built-in defaults and your %d past choice(s)", n)
+	default:
+		return fmt.Sprintf("based on your %d past choice(s)", n)
+	}
+}
+
+// aiLearn feeds a selection back into the model: the asset the user picked
+// against the equally-scored ones they passed over.
+func aiLearn(repoName string, chosen *FilteredAsset, matches []*FilteredAsset) {
+	engine := aiEngineFor()
+	if engine == nil {
+		return
+	}
+
+	rejected := make([]string, 0, len(matches))
+	for _, m := range matches {
+		if m.Name != chosen.Name {
+			rejected = append(rejected, m.Name)
+		}
+	}
+	engine.Observe(chosen.Name, rejected, repoName)
+
+	if err := engine.Save(AIModelDir()); err != nil {
+		log.Debugf("Could not save asset-selection model: %v", err)
+		return
+	}
+	log.Debugf("Asset-selection model learned from this choice (%d selections)", engine.Selections())
+}
 
 // Quiet suppresses the interactive download progress bar. It's set by the TUI,
 // which renders its own UI and can't share the terminal with cheggaaa/pb.
@@ -416,8 +537,8 @@ func archiveStem(name string) (stem string, isTar, isZip bool) {
 }
 
 // preferArchiveType collapses tar-vs-zip duplicates of the same asset, keeping
-// the format preferred for the current OS: tar on Linux/BSD, zip on macOS and
-// Windows. Assets without a tar/zip twin are left untouched.
+// the format preferred for the current OS: tar on Linux/BSD, zip on Windows.
+// Assets without a tar/zip twin are left untouched.
 func preferArchiveType(as []*Asset) []*Asset {
 	preferTar := false
 	for _, os := range resolver.GetOS() {
@@ -607,6 +728,10 @@ func (f *Filter) scoredMatches(repoName string, as []*Asset) []*FilteredAsset {
 					candidateScore += score
 				}
 			}
+			// The learned model deliberately stays out of this score: it decides
+			// only which of several *equally* scored candidates wins, in
+			// FilterAssets. Folding it in here would make exact ties impossible
+			// and so suppress the prompt it learns from.
 			gf.score = candidateScore
 		}
 		if gf.score > 0 {
@@ -732,7 +857,7 @@ func isPlatformOrVersionToken(token string) bool {
 		return true
 	}
 	switch token {
-	case "linux", "darwin", "macos", "osx", "windows", "win",
+	case "linux", "windows", "win",
 		"freebsd", "openbsd", "netbsd", "dragonfly",
 		"unknown", "musl", "gnu", "glibc", "static",
 		"amd64", "x86", "x64", "intel", "arm64", "aarch64", "arm",
@@ -761,6 +886,15 @@ func (f *Filter) FilterAssets(repoName string, as []*Asset) (*FilteredAsset, err
 			return generic[i].String() < generic[j].String()
 		})
 
+		// A model trained on enough past selections can resolve the tie itself.
+		// This runs before the NonInteractive bail-out on purpose: it lets the
+		// TUI get through an ambiguous release it would otherwise have to fail.
+		if chosen := aiPick(repoName, matches); chosen != nil {
+			log.Infof("Selected %s from %d equally-scored assets %s; run `bin update -r %s` to change it",
+				chosen.Name, len(matches), aiBasis(), repoName)
+			return chosen, nil
+		}
+
 		if f.opts.NonInteractive {
 			return nil, fmt.Errorf("multiple matching assets and running non-interactively; run `bin update -r %s` to choose", repoName)
 		}
@@ -770,6 +904,7 @@ func (f *Filter) FilterAssets(repoName string, as []*Asset) (*FilteredAsset, err
 			return nil, err
 		}
 		gf = choice.(*FilteredAsset)
+		aiLearn(repoName, gf, matches)
 		// TODO make user select the proper file
 	} else {
 		gf = matches[0]
@@ -1134,20 +1269,12 @@ func (f *Filter) pickArchiveFile(name string, files map[string][]byte) (string, 
 }
 
 // isBinaryFile reports whether data is an executable binary by actually
-// parsing it as one of the platform object formats (ELF, Mach-O incl. fat,
-// or PE). This introspects the real headers rather than sniffing magic bytes,
-// so docs/scripts/configs are reliably excluded.
+// parsing it as one of the supported object formats (ELF or PE). This
+// introspects the real headers rather than sniffing magic bytes, so
+// docs/scripts/configs are reliably excluded.
 func isBinaryFile(data []byte) bool {
 	r := bytes.NewReader(data)
 	if f, err := elf.NewFile(r); err == nil {
-		f.Close()
-		return true
-	}
-	if f, err := macho.NewFile(r); err == nil {
-		f.Close()
-		return true
-	}
-	if f, err := macho.NewFatFile(r); err == nil {
 		f.Close()
 		return true
 	}

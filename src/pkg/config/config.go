@@ -363,8 +363,6 @@ func legacyStatePaths(configPath string) []string {
 	}
 	if home, err := os.UserHomeDir(); err == nil {
 		switch runtime.GOOS {
-		case "darwin":
-			addNames(filepath.Join(home, "Library", "Application Support", "bin"))
 		case "windows":
 			if ld := os.Getenv("LOCALAPPDATA"); ld != "" {
 				addNames(filepath.Join(ld, "bin"))
@@ -689,6 +687,17 @@ func ConfigDir() string {
 	return filepath.Dir(p)
 }
 
+// StateDir returns the directory holding bin's mutable state — the state file
+// and anything else learned at runtime, as opposed to the user-editable config.
+// It returns "" when no state path can be resolved.
+func StateDir() string {
+	p, err := getStatePath("")
+	if err != nil {
+		return ""
+	}
+	return filepath.Dir(p)
+}
+
 // UpsertBinary adds or updats an existing
 // binary resource in the config
 func UpsertBinary(c *Binary) error {
@@ -875,8 +884,8 @@ func writeState(statePath string) error {
 	return enc.Encode(st)
 }
 
-// GetArch is the running program's operating system target:
-// one of darwin, freebsd, linux, and so on.
+// GetArch returns the running program's architecture (one of amd64, arm64, 386
+// and so on) together with the aliases release assets commonly name it by.
 func GetArch() []string {
 	res := []string{runtime.GOARCH}
 	switch runtime.GOARCH {
@@ -899,8 +908,8 @@ func GetArch() []string {
 	return res
 }
 
-// GetOS is the running program's architecture target:
-// one of 386, amd64, arm, s390x, and so on.
+// GetOS returns the running program's operating system (linux or windows)
+// together with the aliases release assets commonly name it by.
 func GetOS() []string {
 	res := []string{runtime.GOOS}
 	if runtime.GOOS == "windows" {

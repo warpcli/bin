@@ -38,12 +38,29 @@ jobs:
           LDFLAGS="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE} -X main.builtBy=github-actions"
 
           mkdir -p dist
-          targets="linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64"
+          targets="linux/amd64 linux/arm64 windows/amd64"
           for t in $targets; do
+            # CGO_ENABLED=0 is what makes these binaries fully static: with cgo
+            # the net package links the host resolver and the result depends on
+            # the builder's libc. Verified below rather than assumed.
             export GOOS="${t%/*}" GOARCH="${t#*/}" CGO_ENABLED=0
             out="bin"; [ "$GOOS" = "windows" ] && out="bin.exe"
             echo "building $GOOS/$GOARCH"
             go build -trimpath -ldflags "$LDFLAGS" -o "$out" ./src
+
+            if [ "$GOOS" = "linux" ]; then
+              if readelf -d "$out" | grep -q NEEDED; then
+                echo "::error::$GOOS/$GOARCH is dynamically linked:"
+                readelf -d "$out" | grep NEEDED
+                exit 1
+              fi
+              if readelf -l "$out" | grep -q INTERP; then
+                echo "::error::$GOOS/$GOARCH requests a dynamic loader"
+                exit 1
+              fi
+              echo "  verified static: no NEEDED entries, no INTERP segment"
+            fi
+
             pkg="bin_${GOOS}_${GOARCH}"
             if [ "$GOOS" = "windows" ]; then
               zip -q "dist/${pkg}.zip" "$out"

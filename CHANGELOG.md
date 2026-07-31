@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.0] - 2026-07-31
+
+### <!-- 0 -->⛰️  Features
+
+- Introduce asset-selection learning model
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Improve binary static linking and verification
+- Remove all support for macOS
+
 ## [0.2.3] - 2026-07-05
 
 ### <!-- 0 -->⛰️  Features

@@ -11,6 +11,16 @@ GO := go
 PREFIX ?= $(HOME)/.local
 ARGS ?=
 
+# bin is pure Go, so cgo buys it nothing and costs portability. With cgo enabled
+# the net package links the system resolver, and the binary picks up a hard
+# dependency on the build host's libc — on Nix that is an absolute /nix/store
+# path, so the result only runs on the machine that built it. Disabling cgo
+# produces a fully static binary with no libc dependency at all (neither glibc
+# nor musl), which is also what .github/workflows/release.yml builds.
+# Override with `make build CGO_ENABLED=1` if you ever genuinely need cgo.
+CGO_ENABLED ?= 0
+export CGO_ENABLED
+
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null)
 BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS := -s -w \
@@ -26,10 +36,10 @@ $(info ------------------------------------------)
 $(info Project: $(PROJECT_NAME) v$(PROJECT_VERSION))
 $(info ------------------------------------------)
 
-.PHONY: build b compile c run r install uninstall test t test-all cover check vet fmt fmt-check tidy clean changelog verify release help h
+.PHONY: build b compile c run r install uninstall test t test-all cover check static vet fmt fmt-check tidy clean changelog verify release help h
 
 build:
-	@$(GO) build -ldflags "$(LDFLAGS)" -o $(PROJECT_NAME) ./src
+	@$(GO) build -trimpath -ldflags "$(LDFLAGS)" -o $(PROJECT_NAME) ./src
 
 b: build
 
@@ -67,6 +77,25 @@ cover:
 
 check: vet
 
+# static verifies the built binary has no dynamic library dependencies. A Go
+# binary that accidentally links libc still runs fine on the build host, so the
+# regression is invisible without an explicit check.
+static: build
+	@if ! command -v readelf >/dev/null 2>&1; then \
+		echo "readelf not found; skipping static check"; exit 0; \
+	fi
+	@if readelf -d $(PROJECT_NAME) 2>/dev/null | grep -q NEEDED; then \
+		echo "FAIL: $(PROJECT_NAME) is dynamically linked:"; \
+		readelf -d $(PROJECT_NAME) | grep NEEDED; \
+		exit 1; \
+	fi
+	@if readelf -l $(PROJECT_NAME) 2>/dev/null | grep -q INTERP; then \
+		echo "FAIL: $(PROJECT_NAME) requests a dynamic loader:"; \
+		readelf -l $(PROJECT_NAME) | grep -A1 INTERP; \
+		exit 1; \
+	fi
+	@echo "$(PROJECT_NAME): statically linked, no libc dependency"
+
 vet:
 	@$(GO) vet ./...
 
@@ -92,7 +121,7 @@ changelog:
 	fi
 	@git cliff -o CHANGELOG.md
 
-verify: fmt-check vet test
+verify: fmt-check vet test static
 
 release:
 	@if [ -z "$(HAS_REL)" ]; then \
@@ -119,12 +148,13 @@ help:
 	@echo "  test-all     Run tests with the race detector"
 	@echo "  cover        Run tests and print coverage"
 	@echo "  vet          Run go vet"
+	@echo "  static       Verify the binary has no libc dependency"
 	@echo "  fmt          Format the tree and tidy modules"
 	@echo "  fmt-check    Fail if anything is unformatted"
 	@echo "  tidy         Tidy go.mod/go.sum"
 	@echo "  clean        Remove build artifacts"
 	@echo "  changelog    Regenerate CHANGELOG.md (git-cliff)"
-	@echo "  verify       Run the full local gate (fmt-check + vet + test)"
+	@echo "  verify       Run the full local gate (fmt-check + vet + test + static)"
 	@echo "  release      Release a new version (git-rel)"
 	@echo
 	@echo "Examples:"
