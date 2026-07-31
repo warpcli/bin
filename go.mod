@@ -15,12 +15,14 @@ require (
 	github.com/google/go-github/v31 v31.0.0
 	github.com/h2non/filetype v1.1.3
 	github.com/hashicorp/go-version v1.7.0
+	github.com/jbrukh/bayesian v1.1.0
 	github.com/klauspost/compress v1.18.6
 	github.com/krolaw/zipstream v0.0.0-20241109034754-4a67be70fe31
 	github.com/mattn/go-isatty v0.0.20
 	github.com/spf13/cobra v1.9.1
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	github.com/yuin/goldmark v1.7.12
+	github.com/zserge/nanonn/go v0.0.0-20221010084637-cd0aae4ed89f
 	gitlab.com/gitlab-org/api/client-go v0.137.0
 	golang.org/x/oauth2 v0.30.0
 	golang.org/x/sys v0.38.0

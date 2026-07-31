@@ -689,6 +689,17 @@ func ConfigDir() string {
 	return filepath.Dir(p)
 }
 
+// StateDir returns the directory holding bin's mutable state — the state file
+// and anything else learned at runtime, as opposed to the user-editable config.
+// It returns "" when no state path can be resolved.
+func StateDir() string {
+	p, err := getStatePath("")
+	if err != nil {
+		return ""
+	}
+	return filepath.Dir(p)
+}
+
 // UpsertBinary adds or updats an existing
 // binary resource in the config
 func UpsertBinary(c *Binary) error {
