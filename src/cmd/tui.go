@@ -741,7 +741,7 @@ func localMeta(path string) (size int64, arch, libc string) {
 	}
 	f, err := elf.Open(path)
 	if err != nil {
-		return // not an ELF (e.g. macOS/Windows) or missing — size only
+		return // not an ELF (e.g. a Windows build) or missing — size only
 	}
 	defer f.Close()
 

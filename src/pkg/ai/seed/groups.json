@@ -9,22 +9,6 @@
  },
  {
   "repo": "atuin",
-  "platform": "darwin/amd64",
-  "chosen": "atuin-x86_64-apple-darwin.tar.gz",
-  "rejected": [
-   "atuin-server-x86_64-apple-darwin.tar.gz"
-  ]
- },
- {
-  "repo": "atuin",
-  "platform": "darwin/arm64",
-  "chosen": "atuin-aarch64-apple-darwin.tar.gz",
-  "rejected": [
-   "atuin-server-aarch64-apple-darwin.tar.gz"
-  ]
- },
- {
-  "repo": "atuin",
   "platform": "linux/amd64",
   "chosen": "atuin-x86_64-unknown-linux-musl.tar.gz",
   "rejected": [
@@ -53,24 +37,6 @@
  },
  {
   "repo": "bun",
-  "platform": "darwin/amd64",
-  "chosen": "bun-darwin-x64.zip",
-  "rejected": [
-   "bun-darwin-x64-baseline-profile.zip",
-   "bun-darwin-x64-baseline.zip",
-   "bun-darwin-x64-profile.zip"
-  ]
- },
- {
-  "repo": "bun",
-  "platform": "darwin/arm64",
-  "chosen": "bun-darwin-aarch64.zip",
-  "rejected": [
-   "bun-darwin-aarch64-profile.zip"
-  ]
- },
- {
-  "repo": "bun",
   "platform": "windows/amd64",
   "chosen": "bun-windows-x64.zip",
   "rejected": [
@@ -85,48 +51,6 @@
   "chosen": "cloudflared-linux-amd64",
   "rejected": [
    "cloudflared-fips-linux-amd64"
-  ]
- },
- {
-  "repo": "codex",
-  "platform": "darwin/amd64",
-  "chosen": "codex-x86_64-apple-darwin.tar.gz",
-  "rejected": [
-   "codex-app-server-package-x86_64-apple-darwin.tar.gz",
-   "codex-app-server-package-x86_64-apple-darwin.tar.zst",
-   "codex-app-server-x86_64-apple-darwin.tar.gz",
-   "codex-app-server-x86_64-apple-darwin.zst",
-   "codex-code-mode-host-x86_64-apple-darwin.tar.gz",
-   "codex-code-mode-host-x86_64-apple-darwin.zst",
-   "codex-npm-darwin-x64-0.147.0-alpha.4.tgz",
-   "codex-package-x86_64-apple-darwin.tar.gz",
-   "codex-package-x86_64-apple-darwin.tar.zst",
-   "codex-responses-api-proxy-x86_64-apple-darwin.tar.gz",
-   "codex-responses-api-proxy-x86_64-apple-darwin.zst",
-   "codex-symbols-x86_64-apple-darwin-app-server.tar.gz",
-   "codex-symbols-x86_64-apple-darwin.tar.gz",
-   "codex-x86_64-apple-darwin.zst"
-  ]
- },
- {
-  "repo": "codex",
-  "platform": "darwin/arm64",
-  "chosen": "codex-aarch64-apple-darwin.tar.gz",
-  "rejected": [
-   "codex-aarch64-apple-darwin.zst",
-   "codex-app-server-aarch64-apple-darwin.tar.gz",
-   "codex-app-server-aarch64-apple-darwin.zst",
-   "codex-app-server-package-aarch64-apple-darwin.tar.gz",
-   "codex-app-server-package-aarch64-apple-darwin.tar.zst",
-   "codex-code-mode-host-aarch64-apple-darwin.tar.gz",
-   "codex-code-mode-host-aarch64-apple-darwin.zst",
-   "codex-npm-darwin-arm64-0.147.0-alpha.4.tgz",
-   "codex-package-aarch64-apple-darwin.tar.gz",
-   "codex-package-aarch64-apple-darwin.tar.zst",
-   "codex-responses-api-proxy-aarch64-apple-darwin.tar.gz",
-   "codex-responses-api-proxy-aarch64-apple-darwin.zst",
-   "codex-symbols-aarch64-apple-darwin-app-server.tar.gz",
-   "codex-symbols-aarch64-apple-darwin.tar.gz"
   ]
  },
  {
@@ -216,16 +140,6 @@
  },
  {
   "repo": "eza",
-  "platform": "darwin/arm64",
-  "chosen": "eza_aarch64-unknown-linux-gnu.tar.gz",
-  "rejected": [
-   "eza_aarch64-unknown-linux-gnu.zip",
-   "eza_aarch64-unknown-linux-gnu_no_libgit.tar.gz",
-   "eza_aarch64-unknown-linux-gnu_no_libgit.zip"
-  ]
- },
- {
-  "repo": "eza",
   "platform": "linux/amd64",
   "chosen": "eza_x86_64-unknown-linux-musl.tar.gz",
   "rejected": [
@@ -282,22 +196,6 @@
   "chosen": "git-town_linux_arm_64.tar.gz",
   "rejected": [
    "git-town_linux_arm_64.pkg.tar.zst"
-  ]
- },
- {
-  "repo": "goose",
-  "platform": "darwin/amd64",
-  "chosen": "goose-x86_64-apple-darwin.tar.gz",
-  "rejected": [
-   "goose-x86_64-apple-darwin.tar.bz2"
-  ]
- },
- {
-  "repo": "goose",
-  "platform": "darwin/arm64",
-  "chosen": "goose-aarch64-apple-darwin.tar.gz",
-  "rejected": [
-   "goose-aarch64-apple-darwin.tar.bz2"
   ]
  },
  {
@@ -364,14 +262,6 @@
  },
  {
   "repo": "joycast",
-  "platform": "darwin/arm64",
-  "chosen": "joycast-linux-arm64-musl.tar.gz",
-  "rejected": [
-   "joycast-linux-arm64.tar.gz"
-  ]
- },
- {
-  "repo": "joycast",
   "platform": "linux/arm64",
   "chosen": "joycast-linux-arm64-musl.tar.gz",
   "rejected": [
@@ -412,24 +302,6 @@
  },
  {
   "repo": "netbird",
-  "platform": "darwin/amd64",
-  "chosen": "netbird_0.76.1_darwin_amd64.tar.gz",
-  "rejected": [
-   "netbird-ui_0.76.1_darwin_amd64.tar.gz",
-   "netbird-ui_0.76.1_darwin_amd64_signed.zip"
-  ]
- },
- {
-  "repo": "netbird",
-  "platform": "darwin/arm64",
-  "chosen": "netbird_0.76.1_darwin_arm64.tar.gz",
-  "rejected": [
-   "netbird-ui_0.76.1_darwin_arm64.tar.gz",
-   "netbird-ui_0.76.1_darwin_arm64_signed.zip"
-  ]
- },
- {
-  "repo": "netbird",
   "platform": "linux/amd64",
   "chosen": "netbird_0.76.1_linux_amd64.tar.gz",
   "rejected": [
@@ -456,22 +328,6 @@
  },
  {
   "repo": "ollama",
-  "platform": "darwin/amd64",
-  "chosen": "ollama-darwin.tgz",
-  "rejected": [
-   "Ollama-darwin.zip"
-  ]
- },
- {
-  "repo": "ollama",
-  "platform": "darwin/arm64",
-  "chosen": "ollama-darwin.tgz",
-  "rejected": [
-   "Ollama-darwin.zip"
-  ]
- },
- {
-  "repo": "ollama",
   "platform": "linux/amd64",
   "chosen": "ollama-linux-amd64.tar.zst",
   "rejected": [
@@ -495,14 +351,6 @@
   "rejected": [
    "ollama-windows-amd64-mlx.zip",
    "ollama-windows-amd64-rocm.zip"
-  ]
- },
- {
-  "repo": "opencode",
-  "platform": "darwin/amd64",
-  "chosen": "opencode-darwin-x64.zip",
-  "rejected": [
-   "opencode-darwin-x64-baseline.zip"
   ]
  },
  {
@@ -571,14 +419,6 @@
   "rejected": [
    "spotifyd-linux-aarch64-full.tar.gz",
    "spotifyd-linux-aarch64-slim.tar.gz"
-  ]
- },
- {
-  "repo": "tab-rs",
-  "platform": "darwin/amd64",
-  "chosen": "tab-x86_64-unknown-linux-musl.tar.gz",
-  "rejected": [
-   "tab-x86_64-unknown-linux-gnu.tar.gz"
   ]
  },
  {

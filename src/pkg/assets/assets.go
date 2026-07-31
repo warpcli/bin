@@ -6,7 +6,6 @@ import (
 	"compress/bzip2"
 	"compress/gzip"
 	"debug/elf"
-	"debug/macho"
 	"debug/pe"
 	"fmt"
 	"io"
@@ -538,8 +537,8 @@ func archiveStem(name string) (stem string, isTar, isZip bool) {
 }
 
 // preferArchiveType collapses tar-vs-zip duplicates of the same asset, keeping
-// the format preferred for the current OS: tar on Linux/BSD, zip on macOS and
-// Windows. Assets without a tar/zip twin are left untouched.
+// the format preferred for the current OS: tar on Linux/BSD, zip on Windows.
+// Assets without a tar/zip twin are left untouched.
 func preferArchiveType(as []*Asset) []*Asset {
 	preferTar := false
 	for _, os := range resolver.GetOS() {
@@ -858,7 +857,7 @@ func isPlatformOrVersionToken(token string) bool {
 		return true
 	}
 	switch token {
-	case "linux", "darwin", "macos", "osx", "windows", "win",
+	case "linux", "windows", "win",
 		"freebsd", "openbsd", "netbsd", "dragonfly",
 		"unknown", "musl", "gnu", "glibc", "static",
 		"amd64", "x86", "x64", "intel", "arm64", "aarch64", "arm",
@@ -1270,20 +1269,12 @@ func (f *Filter) pickArchiveFile(name string, files map[string][]byte) (string, 
 }
 
 // isBinaryFile reports whether data is an executable binary by actually
-// parsing it as one of the platform object formats (ELF, Mach-O incl. fat,
-// or PE). This introspects the real headers rather than sniffing magic bytes,
-// so docs/scripts/configs are reliably excluded.
+// parsing it as one of the supported object formats (ELF or PE). This
+// introspects the real headers rather than sniffing magic bytes, so
+// docs/scripts/configs are reliably excluded.
 func isBinaryFile(data []byte) bool {
 	r := bytes.NewReader(data)
 	if f, err := elf.NewFile(r); err == nil {
-		f.Close()
-		return true
-	}
-	if f, err := macho.NewFile(r); err == nil {
-		f.Close()
-		return true
-	}
-	if f, err := macho.NewFatFile(r); err == nil {
 		f.Close()
 		return true
 	}

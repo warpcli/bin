@@ -45,16 +45,15 @@ type seedGroup struct {
 	Note     string   `json:"note,omitempty"`
 }
 
-// seedPlatforms mirrors config.GetOS/GetArch exactly. Using a made-up alias list
-// here would manufacture ties that bin never actually sees.
+// seedPlatforms mirrors config.GetOS/GetArch exactly, for every platform bin
+// ships. Using a made-up alias list here would manufacture ties that bin never
+// actually sees.
 var seedPlatforms = []struct {
 	name string
 	res  *mockOSResolver
 }{
 	{"linux/amd64", &mockOSResolver{OS: []string{"linux"}, Arch: []string{"amd64", "x86_64", "x64", "x86-64", "intel_64", "intel64"}, OSSpecificExtensions: []string{"AppImage"}}},
 	{"linux/arm64", &mockOSResolver{OS: []string{"linux"}, Arch: []string{"arm64", "aarch64", "arm_64", "arm-64", "armv8"}, OSSpecificExtensions: []string{"AppImage"}}},
-	{"darwin/amd64", &mockOSResolver{OS: []string{"darwin"}, Arch: []string{"amd64", "x86_64", "x64", "x86-64", "intel_64", "intel64"}}},
-	{"darwin/arm64", &mockOSResolver{OS: []string{"darwin"}, Arch: []string{"arm64", "aarch64", "arm_64", "arm-64", "armv8"}}},
 	{"windows/amd64", &mockOSResolver{OS: []string{"windows", "win"}, Arch: []string{"amd64", "x86_64", "x64", "x86-64", "intel_64", "intel64"}, OSSpecificExtensions: []string{"exe"}}},
 }
 
@@ -292,7 +291,6 @@ func sameTarget(names []string) bool {
 // seedOSPatterns and seedArchPatterns are matched as substrings, in order, so
 // the first match wins. Order is load-bearing:
 //
-//   - "darwin" contains "win", so darwin must be tested before windows;
 //   - "linux-android" is android, not linux;
 //   - "x86_64" must be tested before "x86", and "arm64" before "arm".
 //
@@ -301,6 +299,9 @@ func sameTarget(names []string) bool {
 var (
 	seedOSPatterns = []struct{ pattern, family string }{
 		{"android", "android"}, {"ios", "ios"},
+		// bin does not target Apple platforms, but their assets still show up in
+		// release listings and must be recognised so they are never mistaken for
+		// a supported target.
 		{"darwin", "darwin"}, {"macosx", "darwin"}, {"macos", "darwin"},
 		{"apple", "darwin"}, {"osx", "darwin"},
 		{"freebsd", "freebsd"}, {"netbsd", "netbsd"}, {"openbsd", "openbsd"},

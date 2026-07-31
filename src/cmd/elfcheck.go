@@ -20,7 +20,7 @@ func missingLibs(path string) []string {
 	}
 	ef, err := elf.Open(path)
 	if err != nil {
-		return nil // not an ELF (e.g. macOS/Windows build) or unreadable
+		return nil // not an ELF (e.g. a Windows build) or unreadable
 	}
 	defer ef.Close()
 

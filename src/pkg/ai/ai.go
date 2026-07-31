@@ -497,11 +497,9 @@ var variantTokens = []string{
 // where the project name ends and the platform description begins.
 var platformTokens = map[string]bool{
 	// operating system
-	"linux": true, "darwin": true, "macos": true, "macosx": true, "osx": true,
-	"mac": true, "apple": true, "windows": true, "win": true, "win32": true,
+	"linux": true, "windows": true, "win": true, "win32": true,
 	"win64": true, "freebsd": true, "netbsd": true, "openbsd": true,
 	"dragonfly": true, "solaris": true, "illumos": true, "android": true,
-	"ios": true,
 	// architecture
 	"amd64": true, "x86": true, "x64": true, "i386": true, "i686": true,
 	"i586": true, "arm": true, "arm64": true, "aarch64": true, "armv6": true,
