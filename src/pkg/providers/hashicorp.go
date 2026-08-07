@@ -73,11 +73,9 @@ func (g *hashiCorp) GetID() string {
 func (g *hashiCorp) Fetch(opts *FetchOpts) (*File, error) {
 	var release *hashiCorpRelease
 
-	// If we have a tag, let's fetch from there
 	var err error
 	if len(g.tag) > 0 || len(opts.Version) > 0 {
 		if len(opts.Version) > 0 {
-			// this is used by for the `ensure` command
 			g.tag = opts.Version
 		}
 		log.Debugf("Getting %s release for %s", g.tag, g.repo)
@@ -113,16 +111,13 @@ func (g *hashiCorp) Fetch(opts *FetchOpts) (*File, error) {
 
 	version := release.Version
 
-	// TODO calculate file hash. Not sure if we can / should do it here
-	// since we don't want to read the file unnecesarily. Additionally, sometimes
-	// releases have .sha256 files, so it'd be nice to check for those also
+	// TODO: calculate and verify release asset SHA256 checksum.
 	file := &File{Data: outFile.Source, Name: outFile.Name, Version: version, PackagePath: outFile.PackagePath, PackageFingerprint: outFile.PackageFingerprint, SelectedAsset: assets.NormalizeAssetName(gf.Name), AssetFingerprint: gf.Fingerprint, Libs: outFile.Sidecars}
 
 	return file, nil
 }
 
-// GetLatestVersion checks the latest repo release and
-// returns the corresponding name and url to fetch the version
+// GetLatestVersion returns the latest semantic version and API URL.
 func (g *hashiCorp) GetLatestVersion() (string, string, error) {
 	log.Debugf("Getting latest release for %s", g.repo)
 
@@ -186,7 +181,6 @@ func newHashiCorp(u *url.URL) (Provider, error) {
 		return nil, fmt.Errorf("Error parsing HashiCorp releases URL %s, can't find repo", u.String())
 	}
 
-	// it's a specific releases URL
 	var tag string
 	if len(s) >= 3 {
 		tag = s[2]

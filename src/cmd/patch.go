@@ -12,8 +12,7 @@ import (
 	"github.com/caarlos0/log"
 )
 
-// hostLoader returns the dynamic loader to use for prebuilt binaries on this
-// host: the interpreter of a known-good system binary. Empty if none found.
+// hostLoader returns the host system's dynamic loader path or an empty string.
 func hostLoader() string {
 	for _, ref := range []string{
 		"/bin/sh", "/usr/bin/env", "/bin/ls", "/usr/bin/ls",
@@ -27,17 +26,14 @@ func hostLoader() string {
 	return ""
 }
 
-// patchForHost rewrites a dynamically-linked ELF's interpreter to the host
-// loader so prebuilt binaries run where the embedded
-// loader path doesn't exist. It returns whether the file was changed. Non-ELF,
-// static, or already-correct binaries are left untouched.
+// patchForHost rewrites the ELF interpreter of the binary at path to match hostLoader.
 func patchForHost(path string) (bool, error) {
 	cur, err := elfpatch.Interpreter(path)
 	if err != nil {
-		return false, nil // not a dynamically-linked ELF; nothing to do
+		return false, nil
 	}
 	if _, err := os.Stat(cur); err == nil {
-		return false, nil // existing interpreter resolves fine, leave it
+		return false, nil
 	}
 	loader := hostLoader()
 	if loader == "" {
@@ -54,14 +50,7 @@ func patchForHost(path string) (bool, error) {
 	return true, nil
 }
 
-// applyHostPatches makes a freshly-installed binary runnable on this host: it
-// rewrites the interpreter to the host loader when the embedded one is missing,
-// and, if the binary still can't resolve shared libraries that were shipped in
-// the same archive, installs that closure next to the binary and adds it to
-// RUNPATH. Both steps no-op unless actually needed, so this is safe to always
-// run. It returns the (possibly new) sha256 and whether the file was changed —
-// callers persist that hash to avoid a re-download loop, and the bool so the
-// patch intent can be recorded for future ensures.
+// applyHostPatches rewrites the interpreter and installs missing library sidecars for path.
 func applyHostPatches(path string, libs map[string]*assets.Sidecar, want bool, currentHash []byte) ([]byte, bool) {
 	if !want {
 		return currentHash, false
@@ -89,11 +78,7 @@ func applyHostPatches(path string, libs map[string]*assets.Sidecar, want bool, c
 	return currentHash, changed
 }
 
-// makeRunnable resolves a binary's unresolved shared libraries: those shipped in
-// the same archive are installed into "<bindir>/../lib/<name>/", and those that
-// are system libraries (e.g. libstdc++) are located on the host. All
-// the resulting directories are added to the binary's RUNPATH. Returns whether
-// anything changed.
+// makeRunnable installs missing archive sidecar libraries and updates DT_RUNPATH.
 func makeRunnable(binPath string, libs map[string]*assets.Sidecar) (bool, error) {
 	missing := missingLibs(binPath)
 	if len(missing) == 0 {

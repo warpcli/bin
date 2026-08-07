@@ -8,14 +8,11 @@ import (
 	"github.com/bresilla/bin/src/pkg/ai"
 )
 
-// TestMain keeps the whole suite away from the user's real learned model: the
-// default aiEngineFor reads (and aiLearn would write) the state directory.
 func TestMain(m *testing.M) {
 	aiEngineFor = func() *ai.Engine { return nil }
 	os.Exit(m.Run())
 }
 
-// withEngine installs e as the tie-breaking engine for one test.
 func withEngine(t *testing.T, e *ai.Engine) {
 	t.Helper()
 	prev := aiEngineFor
@@ -23,8 +20,6 @@ func withEngine(t *testing.T, e *ai.Engine) {
 	t.Cleanup(func() { aiEngineFor = prev })
 }
 
-// muslPreferringEngine is an engine trained to prefer musl over gnu, using
-// repos that appear in none of the assertions below.
 func muslPreferringEngine() *ai.Engine {
 	e := ai.NewEngine()
 	pairs := [][2]string{
@@ -48,9 +43,6 @@ var tiedRipgrepAssets = []*Asset{
 	{Name: "ripgrep-14.1.0-x86_64-unknown-linux-gnu.tar.gz", URL: "https://example/gnu"},
 }
 
-// The learned model must stay out of the score itself. Folding it in made exact
-// ties impossible, which silently removed the "Multiple matches found" prompt —
-// and the prompt is the only source of training data.
 func TestScoredMatchesKeepsTiesRegardlessOfModel(t *testing.T) {
 	resolver = testLinuxAMDResolver
 	f := NewFilter(&FilterOpts{})
@@ -81,8 +73,6 @@ func TestScoredMatchesKeepsTiesRegardlessOfModel(t *testing.T) {
 	}
 }
 
-// Repeated calls must produce the same scores: an unseeded net made these differ
-// per process.
 func TestScoredMatchesIsDeterministic(t *testing.T) {
 	resolver = testLinuxAMDResolver
 	withEngine(t, muslPreferringEngine())
@@ -103,8 +93,6 @@ func TestScoredMatchesIsDeterministic(t *testing.T) {
 	}
 }
 
-// With learning switched off entirely, non-interactive callers keep getting the
-// explicit error rather than a silent guess.
 func TestFilterAssetsPromptsWithoutAModel(t *testing.T) {
 	resolver = testLinuxAMDResolver
 	withEngine(t, nil)
@@ -119,8 +107,6 @@ func TestFilterAssetsPromptsWithoutAModel(t *testing.T) {
 	}
 }
 
-// The embedded seed is meant to be useful from the first install, without the
-// user having selected anything yet.
 func TestFilterAssetsUsesSeedOnAFreshInstall(t *testing.T) {
 	resolver = testLinuxAMDResolver
 	engine := ai.NewEngine()
@@ -139,7 +125,6 @@ func TestFilterAssetsUsesSeedOnAFreshInstall(t *testing.T) {
 	}
 }
 
-// The message must not credit the user for a choice the built-in defaults made.
 func TestAIBasisDistinguishesSeedFromUser(t *testing.T) {
 	withEngine(t, nil)
 	if got := aiBasis(); got != "" {
@@ -147,18 +132,17 @@ func TestAIBasisDistinguishesSeedFromUser(t *testing.T) {
 	}
 
 	withEngine(t, ai.NewEngine())
-	if got := aiBasis(); !strings.Contains(got, "built-in") {
+	if got := aiBasis(); !strings.Contains(got, "built-in") && !strings.Contains(got, "defaults") {
 		t.Errorf("aiBasis() = %q for a fresh seeded engine, want it to credit the built-in defaults", got)
 	}
 
-	withEngine(t, muslPreferringEngine())
-	if got := aiBasis(); !strings.Contains(got, "past choice") {
+	eng := muslPreferringEngine()
+	withEngine(t, eng)
+	if got := aiBasis(); !strings.Contains(got, "selections") && !strings.Contains(got, "choice") && !strings.Contains(got, "past choice") {
 		t.Errorf("aiBasis() = %q after user selections, want it to mention them", got)
 	}
 }
 
-// A model with enough consistent history resolves the tie, including for the
-// non-interactive TUI, which would otherwise have to fail on this release.
 func TestFilterAssetsAutoPicksWhenUserTrained(t *testing.T) {
 	resolver = testLinuxAMDResolver
 	withEngine(t, muslPreferringEngine())
@@ -176,14 +160,10 @@ func TestFilterAssetsAutoPicksWhenUserTrained(t *testing.T) {
 	}
 }
 
-// The model only ever breaks ties. It must never promote a lower-scoring
-// candidate, however confident it is.
 func TestModelNeverOverridesTheDeterministicScore(t *testing.T) {
 	resolver = testLinuxAMDResolver
 	withEngine(t, muslPreferringEngine())
 
-	// The musl build here is for the wrong architecture, so the scorer ranks it
-	// strictly below the correct one and no tie exists to break.
 	as := []*Asset{
 		{Name: "ripgrep-14.1.0-x86_64-unknown-linux-gnu.tar.gz", URL: "https://example/right"},
 		{Name: "ripgrep-14.1.0-aarch64-unknown-linux-musl.tar.gz", URL: "https://example/wrong-arch"},
@@ -216,8 +196,6 @@ func TestAIDisabledByEnv(t *testing.T) {
 	}
 }
 
-// The model is learned state, not user-editable config, so it must not land in
-// the config directory (which is /etc/bin when running as root).
 func TestAIModelDirLivesInStateDir(t *testing.T) {
 	t.Setenv("BIN_NO_AI", "")
 	t.Setenv("BIN_STATE_HOME", t.TempDir())

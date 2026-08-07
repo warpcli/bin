@@ -30,18 +30,16 @@ type gitLab struct {
 func (g *gitLab) Fetch(opts *FetchOpts) (*File, error) {
 	var release *gitlab.Release
 
-	// If we have a tag, let's fetch from there
 	var err error
 	projectPath := fmt.Sprintf("%s/%s", g.owner, g.repo)
 	if len(g.tag) > 0 || len(opts.Version) > 0 {
 		if len(opts.Version) > 0 {
-			// this is used by for the `ensure` command
 			g.tag = opts.Version
 		}
 		log.Debugf("Getting %s release for %s/%s", g.tag, g.owner, g.repo)
 		release, _, err = g.client.Releases.GetRelease(projectPath, g.tag)
 	} else {
-		// TODO: handle case when repo doesn't have releases?
+		// TODO: handle repository with no releases.
 		log.Debugf("Getting latest release for %s/%s", g.owner, g.repo)
 		var name string
 		name, _, err = g.GetLatestVersion()
@@ -175,9 +173,7 @@ func (g *gitLab) Fetch(opts *FetchOpts) (*File, error) {
 
 	version := release.TagName
 
-	// TODO calculate file hash. Not sure if we can / should do it here
-	// since we don't want to read the file unnecesarily. Additionally, sometimes
-	// releases have .sha256 files, so it'd be nice to check for those also
+	// TODO: calculate and verify release asset SHA256 checksum.
 	file := &File{Data: outFile.Source, Name: outFile.Name, Version: version, PackagePath: outFile.PackagePath, PackageFingerprint: outFile.PackageFingerprint, SelectedAsset: assets.NormalizeAssetName(gf.Name), AssetFingerprint: gf.Fingerprint, Libs: outFile.Sidecars}
 
 	return file, nil
@@ -187,7 +183,7 @@ func (g *gitLab) GetID() string {
 	return "gitlab"
 }
 
-// GetDescription returns the project's short description.
+// GetDescription returns the project description.
 func (g *gitLab) GetDescription() (string, error) {
 	projectPath := fmt.Sprintf("%s/%s", g.owner, g.repo)
 	p, _, err := g.client.Projects.GetProject(projectPath, &gitlab.GetProjectOptions{})
@@ -197,8 +193,7 @@ func (g *gitLab) GetDescription() (string, error) {
 	return p.Description, nil
 }
 
-// GetLatestVersion checks the latest repo release and
-// returns the corresponding name and url to fetch the version
+// GetLatestVersion returns the latest release tag and commit URL.
 func (g *gitLab) GetLatestVersion() (string, string, error) {
 	log.Debugf("Getting latest release for %s/%s", g.owner, g.repo)
 	projectPath := fmt.Sprintf("%s/%s", g.owner, g.repo)
@@ -242,11 +237,8 @@ func newGitLab(u *url.URL) (Provider, error) {
 		return nil, fmt.Errorf("Error parsing GitLab URL %s, can't find owner and repo", u.String())
 	}
 
-	// it's a specific releases URL
 	var tag string
 	if strings.Contains(u.Path, "/releases/") {
-		// For release URL's, the
-		// path is usually /releases/v0.1.
 		ps := strings.Split(u.Path, "/")
 		for i, p := range ps {
 			if p == "releases" {

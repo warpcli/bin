@@ -8,25 +8,10 @@ import (
 	"github.com/jbrukh/bayesian"
 )
 
-// The seed model ships inside the binary so a fresh install has sensible
-// defaults on day one instead of needing several selections first. It is built
-// offline from a corpus of real release-asset names — see seed/corpus.json for
-// the raw names, seed/groups.json for the labelled tie groups, and
-// src/pkg/assets/seedgroups_test.go for the rules that produced those labels.
-//
-// Its labels come from that rule set, not from anyone's actual choices, so treat
-// it as a prior rather than as learned truth. A user's own selections are
-// trained on top of it and override it over time.
-//
-// Only the two model files are embedded. corpus.json and groups.json are
-// generator inputs and stay out of the binary.
-//
 //go:embed seed/model.json seed/bayesian.gob
 var seedFS embed.FS
 
-// loadSeed applies the embedded model. Failures are silent by design: an engine
-// with initial weights is untrained, and an untrained engine declines to decide,
-// so a missing or unusable seed degrades to "ask the user".
+// loadSeed loads the embedded seed model if present.
 func (e *Engine) loadSeed() {
 	state, err := seedFS.ReadFile("seed/model.json")
 	if err != nil {

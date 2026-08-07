@@ -1,4 +1,4 @@
-// Package ui holds shared lipgloss styling for bin's pretty CLI output and TUI.
+// Package ui provides styling and terminal rendering utilities.
 package ui
 
 import (
@@ -12,27 +12,22 @@ import (
 	"golang.org/x/term"
 )
 
-// Palette — terminal color indexes used across the CLI and TUI.
-//
-// These default to ANSI palette names so pywal-style tools can recolor bin by
-// changing the terminal palette. They can be overridden per-user via the config file
-// (see EnsureTheme / LoadTheme), e.g. with the 232..255 grayscale ramp.
+// Palette defines terminal colors for CLI and TUI components.
 var (
-	ColorPrimary = lipgloss.Color("1")  // accent
-	ColorOK      = lipgloss.Color("2")  // green
-	ColorWarn    = lipgloss.Color("3")  // yellow
-	ColorErr     = lipgloss.Color("9")  // bright red
-	ColorTag     = lipgloss.Color("6")  // cyan
-	ColorMuted   = lipgloss.Color("8")  // gray
-	ColorText    = lipgloss.Color("15") // bright white
+	ColorPrimary = lipgloss.Color("1")
+	ColorOK      = lipgloss.Color("2")
+	ColorWarn    = lipgloss.Color("3")
+	ColorErr     = lipgloss.Color("9")
+	ColorTag     = lipgloss.Color("6")
+	ColorMuted   = lipgloss.Color("8")
+	ColorText    = lipgloss.Color("15")
 
-	// Row backgrounds for the TUI (alternating shades + selected).
-	RowBg         = lipgloss.Color("232") // even rows
-	RowBgAlt      = lipgloss.Color("235") // odd rows
-	RowBgSelected = lipgloss.Color("237") // selected row (closer to accent)
+	RowBg         = lipgloss.Color("232")
+	RowBgAlt      = lipgloss.Color("235")
+	RowBgSelected = lipgloss.Color("237")
 )
 
-// Reusable styles — rebuilt from the palette by applyStyles().
+// Reusable lipgloss styles built from palette colors.
 var (
 	TitleStyle  lipgloss.Style
 	AccentStyle lipgloss.Style
@@ -59,8 +54,7 @@ func applyStyles() {
 	BorderStyle = lipgloss.NewStyle().Foreground(ColorMuted)
 }
 
-// DefaultThemeConf is written to the config file the first time bin runs, so users have
-// a documented file to tweak.
+// DefaultThemeConf defines default theme settings.
 const DefaultThemeConf = `# bin TUI theme — colors are terminal palette indexes (0-255) or hex (#aabbcc).
 # Palette names recolor automatically with pywal-style tools. The 232..255
 # grayscale ramp is handy for subtle row shading.
@@ -80,7 +74,7 @@ row_bg_alt      = 235  # odd rows
 row_bg_selected = 237  # selected row
 `
 
-// EnsureTheme writes a default config if missing, then loads it.
+// EnsureTheme writes and loads theme configuration at path.
 func EnsureTheme(path string) {
 	if path == "" {
 		return
@@ -91,7 +85,7 @@ func EnsureTheme(path string) {
 	_ = LoadTheme(path)
 }
 
-// LoadTheme reads key=value color overrides from path and rebuilds the styles.
+// LoadTheme loads theme color overrides from path.
 func LoadTheme(path string) error {
 	f, err := os.Open(path)
 	if err != nil {
@@ -117,7 +111,7 @@ func LoadTheme(path string) error {
 		}
 		key = strings.TrimSpace(key)
 		val = strings.TrimSpace(val)
-		if i := strings.IndexByte(val, '#'); i >= 0 { // strip trailing comment
+		if i := strings.IndexByte(val, '#'); i >= 0 {
 			val = strings.TrimSpace(val[:i])
 		}
 		switch key {
@@ -147,18 +141,18 @@ func LoadTheme(path string) error {
 	return sc.Err()
 }
 
-// Banner renders a small highlighted title chip.
+// Banner renders a title chip.
 func Banner(s string) string { return TitleStyle.Render(s) }
 
-// Rule renders a full-width horizontal separator line.
+// Rule renders a horizontal line.
 func Rule() string {
 	return MutedStyle.Render(strings.Repeat("─", TerminalWidth()))
 }
 
-// RepoShort strips the scheme from a repo URL (e.g. github.com/owner/repo).
+// RepoShort strips the scheme from a repo URL.
 func RepoShort(u string) string { return repoShortURL(u) }
 
-// Tags renders a list of tags as cyan chips.
+// Tags renders tags as styled text.
 func Tags(tags []string) string {
 	out := make([]string, 0, len(tags))
 	for _, t := range tags {
@@ -167,7 +161,7 @@ func Tags(tags []string) string {
 	return strings.Join(out, " ")
 }
 
-// StatusDot renders a colored status indicator.
+// StatusDot renders a status indicator.
 func StatusDot(ok bool) string {
 	if ok {
 		return OKStyle.Render("● ok")
@@ -175,7 +169,7 @@ func StatusDot(ok bool) string {
 	return ErrStyle.Render("● missing")
 }
 
-// ListRow is one rendered entry for the binary list table.
+// ListRow holds rendered list data.
 type ListRow struct {
 	Path    string
 	Version string
@@ -185,13 +179,11 @@ type ListRow struct {
 	Pinned  bool
 }
 
-// ListTable renders the binary list as a rounded, colorized table sized to the
-// given terminal width. Columns are budgeted and truncated so rows never wrap.
+// ListTable renders a binary list table.
 func ListTable(rows []ListRow, width int) string {
 	if width < 40 {
 		width = 40
 	}
-	// Per-column padding (2 each) + borders for 5 columns ≈ 16 cols of chrome.
 	budget := width - 16
 	if budget < 40 {
 		budget = 40
@@ -201,7 +193,7 @@ func ListTable(rows []ListRow, width int) string {
 	if flex < 24 {
 		flex = 24
 	}
-	nameW := flex * 11 / 20 // ~55% to the binary path
+	nameW := flex * 11 / 20
 	repoW := flex - nameW
 
 	t := ltable.New().
@@ -215,18 +207,18 @@ func ListTable(rows []ListRow, width int) string {
 				return st.Bold(true).Foreground(ColorPrimary)
 			}
 			switch col {
-			case 1: // version
+			case 1:
 				if row >= 0 && row < len(rows) && rows[row].Pinned {
 					return st.Foreground(ColorWarn)
 				}
-			case 2: // tags
+			case 2:
 				return st.Foreground(ColorTag)
-			case 3: // status
+			case 3:
 				if row >= 0 && row < len(rows) && !rows[row].OK {
 					return st.Foreground(ColorErr)
 				}
 				return st.Foreground(ColorOK)
-			case 4: // repo
+			case 4:
 				return st.Foreground(ColorMuted)
 			}
 			return st
@@ -252,7 +244,7 @@ func ListTable(rows []ListRow, width int) string {
 	return t.String()
 }
 
-// clip truncates s to w columns with an ellipsis (plain text).
+// clip truncates s to w columns.
 func clip(s string, w int) string {
 	if w <= 0 {
 		return ""
@@ -274,7 +266,7 @@ func repoShortURL(u string) string {
 	return strings.TrimSuffix(u, "/")
 }
 
-// TerminalWidth returns the current terminal width, or a sensible fallback.
+// TerminalWidth returns the current terminal width.
 func TerminalWidth() int {
 	if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 {
 		return w

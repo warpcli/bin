@@ -16,13 +16,10 @@ import (
 )
 
 func Execute(version string, exit func(int), args []string) {
-	// enable colored output on travis
 	if os.Getenv("CI") != "" {
 		color.NoColor = false
 	}
 
-	// fmt.Println()
-	// defer fmt.Println()
 	newRootCmd(version, exit).Execute(args)
 }
 
@@ -31,8 +28,7 @@ func (cmd *rootCmd) Execute(args []string) {
 
 	switch {
 	case len(args) == 0:
-		// Bare `bin` launches the interactive TUI on a real terminal, and
-		// falls back to `list` when output is piped/redirected.
+		// Launches TUI on terminals or list when output is redirected.
 		if isInteractive() {
 			cmd.cmd.SetArgs([]string{"tui"})
 		} else {
@@ -66,11 +62,10 @@ type rootCmd struct {
 	exit        func(int)
 }
 
-// activeTags holds the value of the persistent --tag flag for the current
-// invocation. Empty means "default".
+// activeTags holds the persistent --tag flag value.
 var activeTags []string
 
-// wantedTags returns the tags to act on, defaulting to "default".
+// wantedTags returns requested tags, defaulting to "default".
 func wantedTags() []string {
 	if len(activeTags) == 0 {
 		return []string{"default"}
@@ -78,8 +73,7 @@ func wantedTags() []string {
 	return activeTags
 }
 
-// tagFilterAll reports whether the user asked for every binary regardless of
-// tag (via --tag all).
+// tagFilterAll reports whether all binaries are requested.
 func tagFilterAll() bool {
 	for _, t := range activeTags {
 		if t == "all" {
@@ -89,7 +83,7 @@ func tagFilterAll() bool {
 	return false
 }
 
-// binTags returns a binary's tags, treating an untagged binary as "default".
+// binTags returns tags for b, defaulting to "default".
 func binTags(b *config.Binary) []string {
 	if len(b.Tags) == 0 {
 		return []string{"default"}
@@ -97,7 +91,7 @@ func binTags(b *config.Binary) []string {
 	return b.Tags
 }
 
-// binHasAnyTag reports whether b carries at least one of the given tags.
+// binHasAnyTag reports whether b matches any of tags.
 func binHasAnyTag(b *config.Binary, tags []string) bool {
 	for _, want := range tags {
 		for _, have := range binTags(b) {
@@ -109,7 +103,7 @@ func binHasAnyTag(b *config.Binary, tags []string) bool {
 	return false
 }
 
-// selectByTag returns the subset of cfg.Bins matching the active tag filter.
+// selectByTag returns binaries matching active tag filters.
 func selectByTag(bins map[string]*config.Binary) map[string]*config.Binary {
 	if tagFilterAll() {
 		return bins
@@ -147,13 +141,11 @@ func newRootCmd(version string, exit func(int)) *rootCmd {
 				DefaultDir: root.defaultPath,
 			})
 
-			// check and load config after handlers are configured
 			err := config.CheckAndLoad()
 			if err != nil {
 				log.Fatalf("Error loading config file %v", err)
 			}
 
-			// Load (or create) the TUI color theme from the config file.
 			ui.EnsureTheme(filepath.Join(config.ConfigDir(), "config"))
 		},
 	}
@@ -188,7 +180,7 @@ func newRootCmd(version string, exit func(int)) *rootCmd {
 	return root
 }
 
-// usageTemplate is a colorized version of cobra's default usage template.
+// usageTemplate specifies the colorized help template.
 const usageTemplate = `{{hdr "Usage:"}}{{if .Runnable}}
   {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
   {{.CommandPath}} [command]{{end}}{{if gt (len .Aliases) 0}}
@@ -214,22 +206,17 @@ const usageTemplate = `{{hdr "Usage:"}}{{if .Runnable}}
 {{muted "Use"}} "{{.CommandPath}} [command] --help" {{muted "for more information about a command."}}{{end}}
 `
 
-// isInteractive reports whether we're attached to a real terminal on both
-// stdin and stdout, so it's safe to launch the full-screen TUI.
+// isInteractive reports whether stdin and stdout are attached to a terminal.
 func isInteractive() bool {
 	return isatty.IsTerminal(os.Stdout.Fd()) && isatty.IsTerminal(os.Stdin.Fd())
 }
 
 func defaultCommand(cmd *cobra.Command, args []string) bool {
-	// find current cmd, if its not root, it means the user actively
-	// set a command, so let it go
 	xmd, _, _ := cmd.Find(args)
 	if xmd != cmd {
 		return false
 	}
 
-	// special case for cobra's default completion command
-	// ref: https://github.com/kubernetes/kubectl/blob/04af20f5a9d2b56d910a36fec84f21164df65d32/pkg/cmd/cmd.go#L132
 	if len(args) > 0 &&
 		(args[0] == "completion" ||
 			args[0] == cobra.ShellCompRequestCmd ||
@@ -237,21 +224,16 @@ func defaultCommand(cmd *cobra.Command, args []string) bool {
 		return false
 	}
 
-	// if we have == 0 args, assume its a ls
 	if len(args) == 0 {
 		return true
 	}
 
-	// given that its 1, check if its one of the valid standalone flags
-	// for the root cmd
 	for _, s := range []string{"-h", "--help", "-v", "--version", "help"} {
 		if s == args[0] {
-			// if it is, we should run the root cmd
 			return false
 		}
 	}
 
-	// otherwise, we should probably prepend ls
 	return true
 }
 

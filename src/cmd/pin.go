@@ -26,7 +26,6 @@ func newPinCmd() *pinCmd {
 
 			binsToPin := map[string]*config.Binary{}
 
-			// To pin
 			if len(args) > 0 {
 				for _, a := range args {
 					bin, err := getBinPath(a)
@@ -41,7 +40,6 @@ func newPinCmd() *pinCmd {
 
 			pinned := []string{}
 
-			// Pinning
 			for name, bin := range binsToPin {
 				bin.Pinned = true
 				err := config.UpsertBinary(bin)

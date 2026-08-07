@@ -16,9 +16,6 @@ func interactive() bool {
 	return term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
 }
 
-// ---- single-choice selector ----
-
-// selectWindow is how many options are visible at once; the rest scroll.
 const selectWindow = 6
 
 type selectModel struct {
@@ -31,7 +28,6 @@ type selectModel struct {
 
 func (m selectModel) Init() tea.Cmd { return nil }
 
-// clampWindow keeps the cursor within the visible scroll window.
 func (m *selectModel) clampWindow() {
 	if m.cursor < m.top {
 		m.top = m.cursor
@@ -218,7 +214,7 @@ func (m pickModel) View() string {
 	return b.String()
 }
 
-// SelectOrInput shows a picker that also lets the user type a custom value.
+// SelectOrInput prompts for a selection or custom text value.
 func SelectOrInput(title string, items []string) (string, error) {
 	if !interactive() {
 		i, err := selectFallback(title, items)
@@ -230,7 +226,7 @@ func SelectOrInput(title string, items []string) (string, error) {
 	ti := textinput.New()
 	ti.Prompt = ""
 	ti.Placeholder = "custom value…"
-	ti.Cursor.SetMode(0) // blink
+	ti.Cursor.SetMode(0)
 	ti.Focus()
 	res, err := tea.NewProgram(pickModel{title: title, items: items, ti: ti}).Run()
 	if err != nil {
@@ -242,8 +238,6 @@ func SelectOrInput(title string, items []string) (string, error) {
 	}
 	return fm.result, nil
 }
-
-// ---- free-text prompt with a default ----
 
 type askModel struct {
 	prompt string
@@ -278,8 +272,7 @@ func (m askModel) View() string {
 		MutedStyle.Render("enter to confirm · esc to cancel")
 }
 
-// AskString prompts for a line of text pre-filled with def. On a non-terminal
-// it returns def unchanged.
+// AskString prompts for a text line pre-filled with def.
 func AskString(prompt, def string) (string, error) {
 	if !interactive() {
 		return def, nil
@@ -303,8 +296,6 @@ func AskString(prompt, def string) (string, error) {
 	}
 	return v, nil
 }
-
-// ---- yes/no confirm ----
 
 type confirmModel struct {
 	question string
@@ -359,7 +350,7 @@ func (m confirmModel) View() string {
 		MutedStyle.Render("←/→ toggle · y/n · enter")
 }
 
-// Confirm asks a yes/no question and returns the answer.
+// Confirm prompts for a boolean decision.
 func Confirm(question string, def bool) (bool, error) {
 	if !interactive() {
 		fmt.Printf("\n%s [%s] ", question, map[bool]string{true: "Y/n", false: "y/N"}[def])

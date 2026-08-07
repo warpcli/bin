@@ -8,8 +8,7 @@ import (
 	"time"
 )
 
-// ProgressReader wraps an io.Reader and renders a colorful single-line progress
-// bar to stderr as bytes flow through it. Call Finish when the copy is done.
+// ProgressReader wraps an io.Reader to render a progress bar.
 type ProgressReader struct {
 	r       io.Reader
 	total   int64
@@ -21,8 +20,7 @@ type ProgressReader struct {
 	w       io.Writer
 }
 
-// NewProgressReader returns a ProgressReader for r with a known total size
-// (use a non-positive total when unknown).
+// NewProgressReader returns a new ProgressReader for r.
 func NewProgressReader(r io.Reader, total int64, label string) *ProgressReader {
 	now := time.Now()
 	return &ProgressReader{r: r, total: total, label: label, start: now, lastOut: now, w: os.Stderr}
@@ -39,7 +37,7 @@ func (p *ProgressReader) Read(b []byte) (int, error) {
 	return n, err
 }
 
-// Finish draws the final 100% frame and moves to the next line.
+// Finish completes progress rendering.
 func (p *ProgressReader) Finish() {
 	if p.done {
 		return

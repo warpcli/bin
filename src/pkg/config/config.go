@@ -17,9 +17,7 @@ var cfg config
 var pathOverrides PathOverrides
 var effectiveUID = os.Geteuid
 
-// PathOverrides are explicit process-local path choices, normally populated
-// from root CLI flags before config is loaded. Empty fields fall back to env
-// vars and then root/user defaults.
+// PathOverrides configures process-local path overrides from CLI flags.
 type PathOverrides struct {
 	ConfigFile string
 	StateFile  string
@@ -32,9 +30,6 @@ func SetPathOverrides(overrides PathOverrides) {
 }
 
 type config struct {
-	// DefaultPath might not be expanded so it's important that
-	// the caller expands this variable with os.ExpandEnv(string)
-	// if necessary
 	DefaultPath string             `json:"default_path"`
 	Bins        map[string]*Binary `json:"bins"`
 }
@@ -46,38 +41,26 @@ type Binary struct {
 	Hash       string `json:"hash"`
 	URL        string `json:"url"`
 	Provider   string `json:"provider"`
-	// Description is the upstream repository's one-line description, persisted
-	// in the manifest/state so the TUI can show it without hitting the network.
+	// Description holds the upstream repository description.
 	Description string `json:"description,omitempty"`
-	// if file is installed from a package format (zip, tar, etc) store
-	// the package path in config so we don't ask the user to select
-	// the path again when upgrading
+	// PackagePath holds the relative binary path within an archive.
 	PackagePath string `json:"package_path"`
 	Pinned      bool   `json:"pinned"`
-	// Tags group binaries into tiers (e.g. "default", "essential"). A binary
-	// with no tags is treated as belonging to "default". Persisted in the
-	// manifest since they're portable, not per-machine state.
+	// Tags groups binaries into organizational tiers.
 	Tags []string `json:"tags,omitempty"`
-	// Patch, when set, makes bin fix up the installed ELF after
-	// install/ensure/update (interpreter + bundled/system libraries) so prebuilt
-	// binaries run on this host. Portable intent, so it lives in the manifest.
+	// Patch reports whether ELF patches are enabled for host compatibility.
 	Patch bool `json:"patch,omitempty"`
-	// StateURL holds a release- or version-specific URL, persisted only in state
+	// StateURL holds the version-specific download URL.
 	StateURL string `json:"-"`
-	// SelectedAsset is the version-normalized name of the release asset the
-	// user picked. AssetFingerprint is the version-normalized, sorted set of
-	// installable assets seen at selection time. Both are persisted only in
-	// state and used to skip re-prompting unless the release layout changes.
-	SelectedAsset    string   `json:"-"`
+	// SelectedAsset holds the normalized name of the chosen asset.
+	SelectedAsset string `json:"-"`
+	// AssetFingerprint holds the set of installable assets.
 	AssetFingerprint []string `json:"-"`
-	// PackageFingerprint is the normalized set of installable files seen inside
-	// the archive at selection time (state-only), used to reuse or re-prompt the
-	// inner-file choice across updates.
+	// PackageFingerprint holds the set of installable archive files.
 	PackageFingerprint []string `json:"-"`
 }
 
-// stateEntry contains per-machine mutable data
-// persisted separately from the manifest
+// stateEntry stores per-machine mutable binary state.
 type stateEntry struct {
 	Version            string   `json:"version"`
 	RemoteName         string   `json:"remote_name,omitempty"`

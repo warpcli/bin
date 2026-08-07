@@ -7,8 +7,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// Dialog renders a crush-style modal: an accent title bar, a body, and a muted
-// footer, wrapped in a rounded accent border.
+// Dialog renders a modal dialog box.
 func Dialog(title, body, footer string) string {
 	bar := lipgloss.NewStyle().
 		Bold(true).Foreground(ColorText).Background(ColorPrimary).
@@ -28,7 +27,7 @@ func Dialog(title, body, footer string) string {
 		Render(b.String())
 }
 
-// Button renders a single-line dialog button, highlighted when focused.
+// Button renders a dialog button.
 func Button(label string, focused bool) string {
 	if focused {
 		return lipgloss.NewStyle().
@@ -40,14 +39,12 @@ func Button(label string, focused bool) string {
 		Padding(0, 3).Render(label)
 }
 
-// Dim flattens a view to a uniform muted color, used as the dimmed backdrop
-// behind a modal.
+// Dim renders s with muted colors.
 func Dim(s string) string {
 	return lipgloss.NewStyle().Foreground(ColorMuted).Render(ansi.Strip(s))
 }
 
-// Overlay composites fg centered over bg (both multi-line strings), splicing
-// fg's lines into bg ANSI-aware. Used to float a dialog over the screen.
+// Overlay places fg centered over bg.
 func Overlay(bg, fg string) string {
 	bgLines := strings.Split(bg, "\n")
 	fgLines := strings.Split(fg, "\n")

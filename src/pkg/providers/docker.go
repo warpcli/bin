@@ -19,7 +19,6 @@ type docker struct {
 
 func (d *docker) Fetch(opts *FetchOpts) (*File, error) {
 	if len(opts.Version) > 0 {
-		// this is used by for the `ensure` command
 		d.tag = opts.Version
 	}
 	log.Infof("Pulling docker image %s:%s", d.repo, d.tag)
@@ -46,7 +45,7 @@ func (d *docker) Fetch(opts *FetchOpts) (*File, error) {
 	}, nil
 }
 
-// TODO: missing implementation here
+// TODO: fetch latest image tag from registry.
 func (d *docker) GetLatestVersion() (string, string, error) {
 	return d.tag, "", nil
 }
@@ -68,8 +67,7 @@ func newDocker(imageURL string) (Provider, error) {
 	return &docker{repo: repo, tag: tag, client: c}, nil
 }
 
-// parseImage parses the image returning the repository and tag.
-// It handles non-canonical URLs like `hashicorp/terraform`.
+// parseImage returns the repository and tag from imageURL.
 func parseImage(imageURL string) (string, string) {
 	image := imageURL
 	tag := "latest"

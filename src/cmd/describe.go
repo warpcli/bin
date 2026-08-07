@@ -11,8 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// fetchDescription returns the upstream repository's one-line description,
-// best-effort (empty string on any error or unsupported provider).
+// fetchDescription returns the upstream repository's description or an empty string on error.
 func fetchDescription(b *config.Binary) string {
 	p, err := providers.New(b.URL, b.Provider)
 	if err != nil {

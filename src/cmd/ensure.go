@@ -32,7 +32,6 @@ func newEnsureCmd() *ensureCmd {
 			cfg := config.Get()
 			binsToProcess := map[string]*config.Binary{}
 
-			// Update specific binaries
 			if len(args) > 0 {
 				for _, a := range args {
 					bin, err := getBinPath(a)
@@ -45,9 +44,7 @@ func newEnsureCmd() *ensureCmd {
 				binsToProcess = selectByTag(cfg.Bins)
 			}
 
-			// TODO: code smell here, this pretty much does
-			// the same thing as install logic. Refactor to
-			// use the same code in both places
+			// TODO: refactor to share installation logic.
 			ensured := 0
 			for _, binCfg := range binsToProcess {
 				if binCfg.Description == "" {
@@ -106,7 +103,7 @@ func newEnsureCmd() *ensureCmd {
 					return fmt.Errorf("error installing binary: %w", err)
 				}
 
-				// Re-apply host patches (interpreter + bundled libs) if wanted.
+				// Re-applies host patches for interpreter and libraries.
 				hash, _ = applyHostPatches(ep, pResult.Libs, binCfg.Patch, hash)
 
 				err = config.UpsertBinary(&config.Binary{

@@ -9,7 +9,7 @@ import (
 // sep prints a full-width separator line.
 func sep() { fmt.Println(ui.Rule()) }
 
-// stepHeader prints a styled "▸ name   detail" header for a per-binary action.
+// stepHeader prints a styled action header.
 func stepHeader(name, detail string) {
 	fmt.Printf("%s %s  %s\n",
 		ui.AccentStyle.Render("▸"),
@@ -18,7 +18,7 @@ func stepHeader(name, detail string) {
 	)
 }
 
-// stepDone prints a styled success line for a per-binary action.
+// stepDone prints a styled success indicator for a completed action.
 func stepDone(verb, name, version string) {
 	fmt.Printf("  %s %s %s %s\n",
 		ui.OKStyle.Render("✓"),
