@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0] - 2026-08-07
+
+### <!-- 3 -->📚 Documentation
+
+- Rename to geto
+- Better docs
+
 ## [0.3.0] - 2026-07-31
 
 ### <!-- 0 -->⛰️  Features
