@@ -3,7 +3,7 @@ package cmd
 import (
 	"testing"
 
-	"github.com/bresilla/bin/src/pkg/config"
+	"github.com/bresilla/geto/src/pkg/config"
 )
 
 func TestBinTagsDefault(t *testing.T) {
@@ -23,7 +23,6 @@ func TestBinHasAnyTag(t *testing.T) {
 	if binHasAnyTag(b, []string{"essential"}) {
 		t.Fatal("did not expect match on 'essential'")
 	}
-	// untagged binary matches "default"
 	if !binHasAnyTag(&config.Binary{}, []string{"default"}) {
 		t.Fatal("untagged binary should match default")
 	}
@@ -53,16 +52,16 @@ func TestSelectByTag(t *testing.T) {
 		"a": {Path: "a", Tags: []string{"default"}},
 		"b": {Path: "b", Tags: []string{"other"}},
 		"c": {Path: "c", Tags: []string{"default", "other"}},
-		"d": {Path: "d"}, // untagged => default
+		"d": {Path: "d"},
 	}
 
-	activeTags = nil                             // default
-	if got := selectByTag(bins); len(got) != 3 { // a, c, d
+	activeTags = nil
+	if got := selectByTag(bins); len(got) != 3 {
 		t.Fatalf("default scope should match 3, got %d", len(got))
 	}
 
 	activeTags = []string{"other"}
-	if got := selectByTag(bins); len(got) != 2 { // b, c
+	if got := selectByTag(bins); len(got) != 2 {
 		t.Fatalf("other scope should match 2, got %d", len(got))
 	}
 

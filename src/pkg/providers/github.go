@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/bresilla/bin/src/pkg/assets"
+	"github.com/bresilla/geto/src/pkg/assets"
 	"github.com/caarlos0/log"
 	"github.com/google/go-github/v31/github"
 	"golang.org/x/oauth2"
@@ -26,12 +26,10 @@ type gitHub struct {
 func (g *gitHub) Fetch(opts *FetchOpts) (*File, error) {
 	var release *github.RepositoryRelease
 
-	// If we have a tag, let's fetch from there
 	var err error
 	var resp *github.Response
 	if len(g.tag) > 0 || len(opts.Version) > 0 {
 		if len(opts.Version) > 0 {
-			// this is used by for the `ensure` command
 			g.tag = opts.Version
 		}
 		log.Debugf("Getting %s release for %s/%s", g.tag, g.owner, g.repo)
@@ -71,16 +69,13 @@ func (g *gitHub) Fetch(opts *FetchOpts) (*File, error) {
 
 	version := release.GetTagName()
 
-	// TODO calculate file hash. Not sure if we can / should do it here
-	// since we don't want to read the file unnecesarily. Additionally, sometimes
-	// releases have .sha256 files, so it'd be nice to check for those also
+	// TODO: calculate and verify release asset SHA256 checksum.
 	file := &File{Data: outFile.Source, Name: outFile.Name, Version: version, PackagePath: outFile.PackagePath, PackageFingerprint: outFile.PackageFingerprint, SelectedAsset: assets.NormalizeAssetName(gf.Name), AssetFingerprint: gf.Fingerprint, Libs: outFile.Sidecars}
 
 	return file, nil
 }
 
-// GetLatestVersion checks the latest repo release and
-// returns the corresponding name and url to fetch the version
+// GetLatestVersion returns the latest release tag and HTML URL.
 func (g *gitHub) GetLatestVersion() (string, string, error) {
 	log.Debugf("Getting latest release for %s/%s", g.owner, g.repo)
 	release, _, err := g.client.Repositories.GetLatestRelease(context.TODO(), g.owner, g.repo)
@@ -95,7 +90,7 @@ func (g *gitHub) GetID() string {
 	return "github"
 }
 
-// GetDescription returns the repository's short description.
+// GetDescription returns the repository description.
 func (g *gitHub) GetDescription() (string, error) {
 	repo, _, err := g.client.Repositories.Get(context.TODO(), g.owner, g.repo)
 	if err != nil {
@@ -110,12 +105,8 @@ func newGitHub(u *url.URL) (Provider, error) {
 		return nil, fmt.Errorf("error parsing Github URL %s, can't find owner and repo", u.String())
 	}
 
-	// it's a specific releases URL
 	var tag string
 	if strings.Contains(u.Path, "/releases/") {
-		// For release and download URL's, the
-		// path is usually /releases/tag/v0.1
-		// or /releases/download/v0.1.
 		ps := strings.Split(u.Path, "/")
 		for i, p := range ps {
 			if p == "releases" {
@@ -130,7 +121,7 @@ func newGitHub(u *url.URL) (Provider, error) {
 		token = os.Getenv("GITHUB_TOKEN")
 	}
 
-	// GHES client
+	// Configures GitHub Enterprise Server client when environment variables are present.
 	gbu := os.Getenv("GHES_BASE_URL")
 	guu := os.Getenv("GHES_UPLOAD_URL")
 	gau := os.Getenv("GHES_AUTH_TOKEN")

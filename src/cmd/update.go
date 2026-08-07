@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/bresilla/bin/src/pkg/config"
-	"github.com/bresilla/bin/src/pkg/prompt"
-	"github.com/bresilla/bin/src/pkg/providers"
+	"github.com/bresilla/geto/src/pkg/config"
+	"github.com/bresilla/geto/src/pkg/prompt"
+	"github.com/bresilla/geto/src/pkg/providers"
 	"github.com/caarlos0/log"
 	"github.com/fatih/color"
 	"github.com/hashicorp/go-version"
@@ -36,25 +36,17 @@ func newUpdateCmd() *updateCmd {
 	cmd := &cobra.Command{
 		Use:           "update [binary_path]",
 		Aliases:       []string{"u", "up", "upgrade"},
-		Short:         "Updates one or multiple binaries managed by bin",
+		Short:         "Updates one or multiple binaries managed by geto",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// TODO add support to update from a specific URL.
-			// This allows to update binares from a repo that contains
-			// multiple tags for different binaries
-
-			// TODO update should check all binaries with a
-			// certain configured parallelism (default 10, can be changed with -p) and report
-			// which binarines could be potentially upgraded.
-			// It's very likely that we have to extend the provider
-			// interface to support this use-case
+			// TODO: support updating from a specific URL.
+			// TODO: check for updates in parallel.
 
 			toUpdate := map[*updateInfo]*config.Binary{}
 			cfg := config.Get()
 			binsToProcess := map[string]*config.Binary{}
 
-			// Update specific binaries
 			if len(args) > 0 {
 				for _, a := range args {
 					bin, err := getBinPath(a)

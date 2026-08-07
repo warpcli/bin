@@ -2,11 +2,11 @@
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.programs.bin;
+  cfg = config.programs.geto;
   defaultPackage =
     if self != null
     then self.packages.${pkgs.system}.default
-    else pkgs.bin;
+    else pkgs.geto;
 
   repoName = repo:
     lib.removeSuffix ".git" (baseNameOf (lib.removeSuffix "/" repo));
@@ -15,7 +15,7 @@ let
     options = {
       repo = lib.mkOption {
         type = lib.types.str;
-        description = "Repository or provider URL understood by bin.";
+        description = "Repository or provider URL understood by geto.";
         example = "github.com/atuinsh/atuin";
       };
       name = lib.mkOption {
@@ -26,13 +26,13 @@ let
       tag = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
         default = null;
-        description = "Single bin tag/tier for this binary.";
+        description = "Single geto tag/tier for this binary.";
         example = "essential";
       };
       tags = lib.mkOption {
         type = lib.types.listOf lib.types.str;
         default = [ ];
-        description = "Bin tags/tiers for this binary. Overrides tag when non-empty.";
+        description = "Geto tags/tiers for this binary. Overrides tag when non-empty.";
       };
       path = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
@@ -47,12 +47,12 @@ let
       description = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
         default = null;
-        description = "Optional description stored in the bin manifest.";
+        description = "Optional description stored in the geto manifest.";
       };
       patch = lib.mkOption {
         type = lib.types.bool;
         default = true;
-        description = "Whether bin should patch ELF interpreter/RUNPATH for this host.";
+        description = "Whether geto should patch ELF interpreter/RUNPATH for this host.";
       };
     };
   };
@@ -61,7 +61,7 @@ let
     options = (entrySpec.getSubOptions [ ]) // {
       repo = lib.mkOption {
         type = lib.types.str;
-        description = "Repository or provider URL understood by bin.";
+        description = "Repository or provider URL understood by geto.";
       };
       name = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
@@ -100,12 +100,12 @@ let
   attrEntries = lib.mapAttrsToList (_: spec: spec) cfg.binaries;
   normalizedEntries = map normalizeEntry (cfg.entries ++ attrEntries);
   manifestBins = builtins.listToAttrs (map (e: { name = e.path; value = e.manifest; }) normalizedEntries);
-  manifest = pkgs.writeText "bin-list.json" (builtins.toJSON {
+  manifest = pkgs.writeText "geto-list.json" (builtins.toJSON {
     default_path = cfg.installDir;
     bins = manifestBins;
   });
 
-  managedPath = pkgs.runCommand "bin-managed-path" { } ''
+  managedPath = pkgs.runCommand "geto-managed-path" { } ''
     mkdir -p "$out/bin"
     ${lib.concatMapStringsSep "\n" (e: ''
       ln -s ${lib.escapeShellArg e.path} "$out/bin/${e.name}"
@@ -113,13 +113,13 @@ let
   '';
 in
 {
-  options.programs.bin = {
-    enable = lib.mkEnableOption "bin declarative binary manager";
+  options.programs.geto = {
+    enable = lib.mkEnableOption "geto declarative binary manager";
     package = lib.mkOption {
       type = lib.types.package;
       default = defaultPackage;
-      defaultText = lib.literalExpression "inputs.bin.packages.\${pkgs.system}.default";
-      description = "bin package to run.";
+      defaultText = lib.literalExpression "inputs.geto.packages.\${pkgs.system}.default";
+      description = "geto package to run.";
     };
     installDir = lib.mkOption {
       type = lib.types.str;
@@ -128,13 +128,13 @@ in
     };
     configFile = lib.mkOption {
       type = lib.types.str;
-      default = "/etc/bin/list.json";
-      description = "Generated bin manifest path for this module-managed instance.";
+      default = "/etc/geto/list.json";
+      description = "Generated geto manifest path for this module-managed instance.";
     };
     stateFile = lib.mkOption {
       type = lib.types.str;
-      default = "/var/lib/bin/config.state.json";
-      description = "Mutable bin state path for versions, hashes, and selected assets.";
+      default = "/var/lib/geto/config.state.json";
+      description = "Mutable geto state path for versions, hashes, and selected assets.";
     };
     addToPath = lib.mkOption {
       type = lib.types.bool;
@@ -144,12 +144,12 @@ in
     service.enable = lib.mkOption {
       type = lib.types.bool;
       default = true;
-      description = "Enable the systemd oneshot that writes list.json and runs bin ensure.";
+      description = "Enable the systemd oneshot that writes list.json and runs geto ensure.";
     };
     entries = lib.mkOption {
       type = lib.types.listOf (lib.types.either lib.types.str entrySpec);
       default = [ ];
-      description = "List of repositories or binary entries. Nix turns this into bin's list.json; bin ensure fills state.";
+      description = "List of repositories or binary entries. Nix turns this into geto's list.json; geto ensure fills state.";
       example = lib.literalExpression ''
         [
           "github.com/rust-lang/mdBook"
@@ -179,41 +179,41 @@ in
       esac
     '';
 
-    environment.etc = lib.mkIf (cfg.configFile == "/etc/bin/list.json") {
-      "bin/list.json".source = manifest;
+    environment.etc = lib.mkIf (cfg.configFile == "/etc/geto/list.json") {
+      "geto/list.json".source = manifest;
     };
 
     systemd.tmpfiles.rules = [
       "d ${cfg.installDir} 0755 root root -"
       "d ${dirOf cfg.stateFile} 0755 root root -"
-    ] ++ lib.optional (cfg.configFile != "/etc/bin/list.json")
+    ] ++ lib.optional (cfg.configFile != "/etc/geto/list.json")
       "d ${dirOf cfg.configFile} 0755 root root -";
 
-    systemd.services.bin-ensure = lib.mkIf cfg.service.enable {
-      description = "Ensure declarative bin-managed binaries";
+    systemd.services.geto-ensure = lib.mkIf cfg.service.enable {
+      description = "Ensure declarative geto-managed binaries";
       wantedBy = [ "multi-user.target" ];
       wants = [ "network-online.target" ];
       after = [ "network-online.target" ];
       restartTriggers = [ manifest cfg.package ];
       environment = {
-        BIN_NONINTERACTIVE = "1";
-      } // lib.optionalAttrs (cfg.configFile != "/etc/bin/list.json") {
-        BIN_CONFIG_FILE = cfg.configFile;
-      } // lib.optionalAttrs (cfg.stateFile != "/var/lib/bin/config.state.json") {
-        BIN_STATE_FILE = cfg.stateFile;
+        GETO_NONINTERACTIVE = "1";
+      } // lib.optionalAttrs (cfg.configFile != "/etc/geto/list.json") {
+        GETO_CONFIG_FILE = cfg.configFile;
+      } // lib.optionalAttrs (cfg.stateFile != "/var/lib/geto/config.state.json") {
+        GETO_STATE_FILE = cfg.stateFile;
       } // lib.optionalAttrs (cfg.installDir != "/usr/local/bin") {
-        BIN_DEFAULT_PATH = cfg.installDir;
+        GETO_DEFAULT_PATH = cfg.installDir;
       };
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
       };
       script = ''
-        ${lib.optionalString (cfg.configFile != "/etc/bin/list.json") ''
+        ${lib.optionalString (cfg.configFile != "/etc/geto/list.json") ''
           ${pkgs.coreutils}/bin/install -D -m 0644 ${manifest} ${lib.escapeShellArg cfg.configFile}
         ''}
         ${pkgs.coreutils}/bin/mkdir -p ${lib.escapeShellArg cfg.installDir} ${lib.escapeShellArg (dirOf cfg.stateFile)}
-        exec ${cfg.package}/bin/bin --tag all ensure
+        exec ${cfg.package}/bin/geto --tag all ensure
       '';
     };
   };

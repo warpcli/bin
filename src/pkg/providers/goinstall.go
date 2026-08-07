@@ -58,7 +58,6 @@ func (g *goinstall) Fetch(opts *FetchOpts) (*File, error) {
 
 	if (len(g.tag) > 0 && g.tag != "latest") || len(opts.Version) > 0 {
 		if len(opts.Version) > 0 {
-			// this is used by for the `ensure` command
 			g.tag = opts.Version
 		}
 		log.Debugf("Getting %s release for %s", g.tag, g.repo)
@@ -86,8 +85,6 @@ func (g *goinstall) Fetch(opts *FetchOpts) (*File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open path '%s': %w", goBinPath, err)
 	}
-	// don't close and keep it for Data, bin is short lived CLI tool
-	// defer file.Close()
 
 	return &File{
 		Data:    file,

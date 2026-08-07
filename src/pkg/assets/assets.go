@@ -17,11 +17,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/bresilla/bin/src/pkg/ai"
-	"github.com/bresilla/bin/src/pkg/config"
-	"github.com/bresilla/bin/src/pkg/options"
-	bstrings "github.com/bresilla/bin/src/pkg/strings"
-	"github.com/bresilla/bin/src/pkg/ui"
+	"github.com/bresilla/geto/src/pkg/ai"
+	"github.com/bresilla/geto/src/pkg/config"
+	"github.com/bresilla/geto/src/pkg/options"
+	bstrings "github.com/bresilla/geto/src/pkg/strings"
+	"github.com/bresilla/geto/src/pkg/ui"
 	"github.com/caarlos0/log"
 	"github.com/h2non/filetype"
 	"github.com/h2non/filetype/matchers"
@@ -39,10 +39,7 @@ var (
 	aiOnce   sync.Once
 )
 
-// AIModelDir returns the directory holding the learned asset-selection model,
-// or "" when learning is disabled or no state directory could be resolved. The
-// model is state bin learns rather than user config, so it lives beside the
-// state file — in system mode that keeps it out of /etc.
+// AIModelDir returns the directory path for the AI model.
 func AIModelDir() string {
 	if aiDisabled() {
 		return ""
@@ -54,17 +51,16 @@ func AIModelDir() string {
 	return filepath.Join(dir, "ai")
 }
 
-// aiDisabled reports whether BIN_NO_AI opts out of asset-selection learning.
+// aiDisabled reports whether GETO_NO_AI opts out of asset-selection learning.
 func aiDisabled() bool {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv("BIN_NO_AI"))) {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("GETO_NO_AI"))) {
 	case "1", "true", "yes", "on":
 		return true
 	}
 	return false
 }
 
-// getAIEngine returns the process-wide engine, or nil when asset learning is
-// disabled or no model directory could be resolved.
+// getAIEngine returns the process-wide AI engine.
 func getAIEngine() *ai.Engine {
 	aiOnce.Do(func() {
 		dir := AIModelDir()
@@ -83,14 +79,10 @@ func getAIEngine() *ai.Engine {
 	return aiEngine
 }
 
-// aiEngineFor resolves the engine used for tie-breaking. Tests replace it so
-// they never read or write the user's real model.
+// aiEngineFor resolves the AI engine used for tie-breaking.
 var aiEngineFor = getAIEngine
 
-// aiPick asks the learned model to break a tie between candidates the
-// deterministic scorer rated equally. It returns nil whenever the model isn't
-// confident enough, leaving the prompt — and the training signal it produces —
-// in place.
+// aiPick returns the AI-selected asset for tie-breaking.
 func aiPick(repoName string, matches []*FilteredAsset) *FilteredAsset {
 	engine := aiEngineFor()
 	if engine == nil || !engine.Trained() {
@@ -101,22 +93,20 @@ func aiPick(repoName string, matches []*FilteredAsset) *FilteredAsset {
 	for _, m := range matches {
 		names = append(names, m.Name)
 	}
-	sort.Strings(names)
 
-	best, ok := engine.Decide(names, repoName)
+	bestName, ok := engine.Decide(names, repoName)
 	if !ok {
 		return nil
 	}
 	for _, m := range matches {
-		if m.Name == best {
+		if m.Name == bestName {
 			return m
 		}
 	}
 	return nil
 }
 
-// aiBasis describes what an automatic choice was based on, so the message
-// doesn't credit the user for a decision the built-in defaults made.
+// aiBasis returns the origin description of an automatic asset choice.
 func aiBasis() string {
 	engine := aiEngineFor()
 	if engine == nil {
@@ -132,38 +122,30 @@ func aiBasis() string {
 	}
 }
 
-// aiLearn feeds a selection back into the model: the asset the user picked
-// against the equally-scored ones they passed over.
 func aiLearn(repoName string, chosen *FilteredAsset, matches []*FilteredAsset) {
 	engine := aiEngineFor()
-	if engine == nil {
+	if engine == nil || chosen == nil || len(matches) <= 1 {
 		return
 	}
-
-	rejected := make([]string, 0, len(matches))
+	rejected := make([]string, 0, len(matches)-1)
 	for _, m := range matches {
-		if m.Name != chosen.Name {
+		if m != chosen {
 			rejected = append(rejected, m.Name)
 		}
 	}
 	engine.Observe(chosen.Name, rejected, repoName)
-
-	if err := engine.Save(AIModelDir()); err != nil {
-		log.Debugf("Could not save asset-selection model: %v", err)
-		return
+	dir := AIModelDir()
+	if dir != "" {
+		if err := engine.Save(dir); err != nil {
+			log.Debugf("Failed to save asset-selection model: %v", err)
+		}
 	}
-	log.Debugf("Asset-selection model learned from this choice (%d selections)", engine.Selections())
 }
 
-// Quiet suppresses the interactive download progress bar. It's set by the TUI,
-// which renders its own UI and can't share the terminal with cheggaaa/pb.
 var Quiet bool
 
 type Asset struct {
-	Name string
-	// Some providers (like gitlab) have non-descriptive names for files,
-	// so we're using this DisplayName as a helper to produce prettier
-	// outputs for bin
+	Name        string
 	DisplayName string
 	URL         string
 }
@@ -182,9 +164,9 @@ type FilteredAsset struct {
 	URL          string
 	score        int
 	ExtraHeaders map[string]string
-	// Fingerprint is the version-normalized, sorted set of installable assets
-	// this selection was made from, used later to detect layout changes.
-	Fingerprint []string
+	Fingerprint  []string
+	Data         []byte
+	Sidecars     map[string]*Sidecar
 }
 
 type finalFile struct {
@@ -192,14 +174,10 @@ type finalFile struct {
 	Name               string
 	PackagePath        string
 	PackageFingerprint []string
-	// Sidecars holds shared libraries shipped alongside the chosen binary in the
-	// same archive (the binary's dependency closure), keyed by basename. Only
-	// populated when FilterOpts.CollectLibs is set.
-	Sidecars map[string]*Sidecar
+	Sidecars           map[string]*Sidecar
 }
 
-// Sidecar is one shared library extracted from an archive: either a regular
-// file (Data set) or a symlink (Link set to the target's basename).
+// Sidecar represents a shared library file or symlink.
 type Sidecar struct {
 	Data []byte
 	Link string
@@ -221,43 +199,23 @@ type Filter struct {
 }
 
 type FilterOpts struct {
-	SkipScoring   bool
-	SkipPathCheck bool
+	SkipScoring     bool
+	SkipPathCheck   bool
+	PackageName     string
+	PrevPackagePath string
 
-	// In case of updates, we're sending the previous version package path
-	// so in case it's the same one, we can re-use it.
-	PackageName string
-
-	// If target file is in a package format (tar, zip,etc) use this
-	// variable to filter the resulting outputs. This is very useful
-	// so we don't prompt the user to pick the file again on updates.
-	// PackageFingerprint is the version-normalized set of installable files
-	// the package path was chosen from — when it's unchanged we reuse the same
-	// file (with the new version in its name); when it changes we re-prompt.
 	PackagePath        string
 	PackageFingerprint []string
 
-	// SelectedAsset is the previously chosen asset (version-normalized) and
-	// AssetFingerprint the normalized asset set it was chosen from. When the
-	// current release matches the fingerprint, SelectReleaseAsset reuses the
-	// remembered choice instead of prompting. Recheck forces a fresh prompt.
 	SelectedAsset    string
 	AssetFingerprint []string
 	Recheck          bool
-	// WantedAsset and WantedPackagePath are declarative exact choices, used by
-	// noninteractive integrations such as NixOS modules. They bypass scoring
-	// but still require the named asset/file to exist in the current release.
+
 	WantedAsset       string
 	WantedPackagePath string
 
-	// NonInteractive makes asset selection fail instead of prompting when it
-	// can't decide on its own. Used by the TUI, which owns the terminal.
 	NonInteractive bool
-
-	// CollectLibs makes archive extraction also capture the chosen binary's
-	// shared-library dependency closure (sibling .so files in the same archive),
-	// so the caller can install them next to the binary and patch its RUNPATH.
-	CollectLibs bool
+	CollectLibs    bool
 }
 
 type runtimeResolver struct{}

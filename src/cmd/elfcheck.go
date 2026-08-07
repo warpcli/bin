@@ -11,22 +11,20 @@ import (
 	"github.com/caarlos0/log"
 )
 
-// missingLibs returns the NEEDED shared libraries of an ELF binary that can't be
-// resolved through the standard dynamic-linker search paths. It replicates
-// glibc's lookup order in pure Go — no ldd, no executing the binary.
+// missingLibs returns unresolvable DT_NEEDED shared libraries for the ELF binary at path.
 func missingLibs(path string) []string {
 	if runtime.GOOS != "linux" {
 		return nil
 	}
 	ef, err := elf.Open(path)
 	if err != nil {
-		return nil // not an ELF (e.g. a Windows build) or unreadable
+		return nil
 	}
 	defer ef.Close()
 
 	needed, err := ef.ImportedLibraries()
 	if err != nil || len(needed) == 0 {
-		return nil // statically linked or no dynamic deps
+		return nil
 	}
 
 	origin := filepath.Dir(path)
@@ -48,7 +46,7 @@ func missingLibs(path string) []string {
 	rpath, _ := ef.DynString(elf.DT_RPATH)
 
 	var dirs []string
-	// DT_RPATH is only consulted by glibc when DT_RUNPATH is absent.
+	// Consults DT_RPATH only when DT_RUNPATH is absent.
 	if len(runpath) == 0 {
 		for _, r := range rpath {
 			dirs = append(dirs, split(r)...)
@@ -68,8 +66,7 @@ func missingLibs(path string) []string {
 	return missing
 }
 
-// systemLibDirs returns the host's library search directories that aren't
-// specific to a particular binary (env vars, ld.so.conf, and the defaults).
+// systemLibDirs returns host library search directories from environment variables, ld.so.conf, and default system paths.
 func systemLibDirs() []string {
 	var dirs []string
 	for _, p := range strings.Split(os.Getenv("LD_LIBRARY_PATH"), ":") {
@@ -98,8 +95,7 @@ func libFound(lib string, dirs []string) bool {
 	return false
 }
 
-// ldSoConfDirs reads library directories from /etc/ld.so.conf and its includes
-// (the text source the binary ld.so.cache is built from).
+// ldSoConfDirs reads library directories from path and its include directives.
 func ldSoConfDirs(path string, seen map[string]bool) []string {
 	if seen[path] {
 		return nil
@@ -131,8 +127,7 @@ func ldSoConfDirs(path string, seen map[string]bool) []string {
 	return dirs
 }
 
-// warnMissingLibs prints a warning when an installed binary has shared-library
-// dependencies that aren't resolvable on this system.
+// warnMissingLibs logs a warning when path has unresolvable shared-library dependencies.
 func warnMissingLibs(path string) {
 	miss := missingLibs(path)
 	if len(miss) == 0 {

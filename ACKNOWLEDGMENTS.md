@@ -1,6 +1,6 @@
 # Acknowledgments
 
-`bin` is a hard fork of [**marcosnils/bin**](https://github.com/marcosnils/bin) by
+`geto` is a hard fork of [**marcosnils/bin**](https://github.com/marcosnils/bin) by
 **Marcos Lilljedahl** and its contributors.
 
 Marcos built the original, elegant foundation this project stands on — the
@@ -14,14 +14,14 @@ descriptions, a Bubble Tea TUI, and a reworked CLI. It would not exist without
 the upstream project.
 
 - Upstream: https://github.com/marcosnils/bin
-- This fork: https://github.com/bresilla/bin
+- This fork: https://github.com/bresilla/geto
 
 The original code is MIT licensed; this fork keeps the MIT license and preserves
 the original copyright alongside the fork's — see [LICENSE](./LICENSE).
 
 ## Standing on the shoulders of giants
 
-`bin` also leans heavily on the wonderful [Charm](https://github.com/charmbracelet)
+`geto` also leans heavily on the wonderful [Charm](https://github.com/charmbracelet)
 ecosystem — [Bubble Tea](https://github.com/charmbracelet/bubbletea),
 [Bubbles](https://github.com/charmbracelet/bubbles), and
 [Lip Gloss](https://github.com/charmbracelet/lipgloss) — for the TUI and the

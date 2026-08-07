@@ -6,15 +6,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/bresilla/bin/src/pkg/options"
+	"github.com/bresilla/geto/src/pkg/options"
 	"github.com/caarlos0/log"
 )
 
-// getDefaultPath reads the user's PATH variable
-// and returns the first directory that's writable by the current
-// user in the system
-// TODO add feature to prompt the user which to select
-// if many paths are found
+// getDefaultPath returns a writable directory from PATH.
+// TODO: support selecting from multiple valid PATH entries.
 func getDefaultPath() (string, error) {
 	penv := os.Getenv("PATH")
 	log.Debugf("User PATH is [%s]", penv)
@@ -55,7 +52,6 @@ func checkDirExistsAndWritable(dir string) error {
 		return err
 	}
 
-	// Check if the user bit is enabled in file permission
 	if info.Mode().Perm()&(1<<(uint(7))) == 0 {
 		return errors.New(fmt.Sprintf("Dir %s is not writable", dir))
 	}

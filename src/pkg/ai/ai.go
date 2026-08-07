@@ -1,21 +1,4 @@
-// Package ai implements the small on-device learner that helps bin pick the
-// right release asset when the deterministic scorer can't decide on its own.
-//
-// It only ever runs on a tie. The scorer in pkg/assets ranks candidates by
-// OS/arch/repo-name hits; when several candidates come out exactly equal, this
-// package is asked whether it is confident enough to break the tie. When it
-// isn't — which includes every fresh install — the user is prompted as before,
-// and that answer is fed back through Observe as a training example. Keeping
-// the prompt as the fallback matters: it is the only source of training data,
-// so a model that suppressed it would freeze at whatever it learned first.
-//
-// Two models cooperate. A naive-bayes classifier over filename tokens learns
-// vocabulary preferences (musl over gnu, static over dynamic, tar over zip)
-// that the hand-written rules know nothing about. A small neural net then
-// combines that text score with a handful of structural features into a single
-// confidence. The features are deliberately restricted to properties that can
-// actually differ between tied candidates: OS and arch belong to the scorer,
-// and by the time we are called they are equal by definition.
+// Package ai ranks release asset candidates using naive Bayes and neural network scoring.
 package ai
 
 import (
@@ -41,11 +24,7 @@ const (
 	MismatchClass bayesian.Class = "Mismatch"
 )
 
-// modelVersion is bumped whenever the tokenizer or the feature vector changes.
-// Both invalidate every previously saved model, since old weights were fit
-// against inputs that no longer mean the same thing.
-//
-// 2: features reworked against a corpus of real releases (see seed/corpus.json).
+// modelVersion identifies the feature vector schema version.
 const modelVersion = 2
 
 const (
@@ -59,36 +38,28 @@ const (
 	learningRate = 0.1
 	trainEpochs  = 5
 
-	// initSeed keeps weight initialisation deterministic. nanonn seeds Dense
-	// layers from the global math/rand, which Go auto-seeds per process, so an
-	// untrained engine would otherwise rank the same assets differently on
-	// every invocation — unacceptable for a tool that installs binaries.
-	initSeed = 0x62696e41 // "binA"
+	// initSeed sets the deterministic random seed for weight initialization.
+	initSeed = 0x62696e41
 )
 
-// Confidence gate. The engine only breaks a tie once it has learned from enough
-// real selections and the winner is clearly ahead of the runner-up. Anything
-// less falls through to the prompt.
+// Gate thresholds for automatic tie-breaking.
 const (
 	minSelections = 5
 	minTopScore   = 0.60
 	minMargin     = 0.20
 )
 
-// Feature indices, named so the persisted weight vector and the extraction code
-// can't drift apart silently. Every one of these was chosen because it varies
-// between candidates that the deterministic scorer rates equally — the shape of
-// real ties, measured over seed/corpus.json rather than guessed.
+// Feature indices for candidate scoring.
 const (
-	fBayes    = iota // classifier's P(Match) over the filename's tokens
-	fMusl            // musl build: static, no glibc coupling
-	fGnu             // glibc build
-	fStatic          // explicitly labelled static
-	fRepoRank        // primary artifact vs companion binary vs unrelated
-	fVariant         // marked as a secondary artifact (symbols, profile, cuda, ...)
-	fTarball         // .tar / .tar.gz / .tgz
-	fZip             // .zip
-	fExotic          // .bz2 / .xz / .zst / .7z — rarely the primary artifact
+	fBayes = iota
+	fMusl
+	fGnu
+	fStatic
+	fRepoRank
+	fVariant
+	fTarball
+	fZip
+	fExotic
 
 	numFeatures
 )
@@ -244,14 +215,7 @@ func (e *Engine) Decide(names []string, repoName string) (best string, ok bool) 
 	return best, true
 }
 
-// Observe records a real user selection: chosen is the asset they picked,
-// rejected the equally-scored candidates they passed over.
-//
-// Note the absence of a ConvertTermsFreqToTfIdf call. bayesian panics if it is
-// invoked more than once, and it persists that fact into the gob, so calling it
-// here would crash on the second selection in a process and on the first
-// selection of every later run. It is also a no-op for the plain (non-TF-IDF)
-// classifier this engine builds.
+// Observe records a user asset selection and trains the engine.
 func (e *Engine) Observe(chosen string, rejected []string, repoName string) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -260,11 +224,7 @@ func (e *Engine) Observe(chosen string, rejected []string, repoName string) {
 	e.selections++
 }
 
-// ObserveRejections records only that some candidates are wrong, without
-// claiming any of the others is right. The seed generator uses it for groups
-// whose remaining candidates are a genuine toss-up (a gnu/musl pair, say): the
-// companion binaries and debug artifacts in the group are still worth learning
-// as negatives, but asserting a winner there would be inventing a preference.
+// ObserveRejections records candidate rejections without selecting a winner.
 func (e *Engine) ObserveRejections(rejected []string, repoName string) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -272,13 +232,6 @@ func (e *Engine) ObserveRejections(rejected []string, repoName string) {
 	e.learn("", rejected, repoName)
 }
 
-// learn runs the shared training step. chosen may be empty, in which case only
-// the negatives are learned. Callers must hold the lock.
-//
-// A group is one winner against several losers — about 1:3 across the corpus.
-// Feeding the losers unopposed teaches the net to answer "no" to everything,
-// which surfaces as the confidence gate abstaining on cases it should call, so
-// the winner is paired against each loser in turn to keep the classes balanced.
 func (e *Engine) learn(chosen string, rejected []string, repoName string) {
 	if len(rejected) == 0 {
 		if chosen != "" {
@@ -297,9 +250,6 @@ func (e *Engine) learn(chosen string, rejected []string, repoName string) {
 		e.classifier.Learn(tokenize(r), MismatchClass)
 	}
 
-	// Features are re-extracted on every step on purpose: fBayes is a function of
-	// the classifier that was just updated, so the net trains against the input
-	// distribution it will actually see at Score time.
 	for i := 0; i < trainEpochs; i++ {
 		for _, r := range rejected {
 			if chosen != "" {
@@ -310,11 +260,7 @@ func (e *Engine) learn(chosen string, rejected []string, repoName string) {
 	}
 }
 
-// Save writes the model to dir, replacing any previous one. Both files are
-// written to a temporary name and renamed into place, so an interrupted save
-// leaves the old model intact rather than a truncated one. Two bin processes
-// saving at once is last-writer-wins: one selection's learning is lost, but
-// neither reader ever sees a partial file.
+// Save writes the model files atomically to dir.
 func (e *Engine) Save(dir string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -326,13 +272,10 @@ func (e *Engine) Save(dir string) error {
 		return err
 	}
 
-	// encoding/json cannot represent NaN or Inf, so a diverged net would fail
-	// to marshal with an opaque error. Catch it here with a clear one instead.
 	if !allFinite(e.layer1.Weights()) || !allFinite(e.layer2.Weights()) {
 		return errors.New("refusing to save non-finite weights")
 	}
 
-	// Encode into memory first so a failing encode can't touch the disk.
 	var buf bytes.Buffer
 	if err := e.classifier.WriteGob(&buf); err != nil {
 		return fmt.Errorf("encoding classifier: %w", err)
@@ -354,10 +297,7 @@ func (e *Engine) Save(dir string) error {
 	return writeFileAtomic(filepath.Join(dir, stateFile), state)
 }
 
-// Load restores a model previously written by Save. A missing, unreadable, or
-// version-mismatched model is reported as an error and leaves the engine at its
-// deterministic initial state — an untrained engine declines to decide, so a
-// corrupt model degrades to "ask the user" rather than to silent guessing.
+// Load restores model state from dir.
 func (e *Engine) Load(dir string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -383,8 +323,6 @@ func (e *Engine) Load(dir string) error {
 	if got, want := len(state.Weights2), len(e.layer2.Weights()); got != want {
 		return fmt.Errorf("output layer has %d weights, want %d", got, want)
 	}
-	// Unreachable through JSON, which can't encode NaN or Inf, but cheap
-	// insurance against a hand-edited or differently-encoded model.
 	if !allFinite(state.Weights1) || !allFinite(state.Weights2) {
 		return errors.New("model contains non-finite weights")
 	}
@@ -400,11 +338,8 @@ func (e *Engine) Load(dir string) error {
 	if err != nil {
 		return fmt.Errorf("reading %s: %w", classifierFile, err)
 	}
-	// Models written by earlier builds carry DidConvertTfIdf, which arms the
-	// panic described on Observe. This engine never converts, so clear it.
 	c.DidConvertTfIdf = false
 
-	// Everything validated: commit.
 	e.classifier = c
 	e.layer1.SetWeights(state.Weights1)
 	e.layer2.SetWeights(state.Weights2)
@@ -413,8 +348,7 @@ func (e *Engine) Load(dir string) error {
 	return nil
 }
 
-// Reset deletes the learned model from dir, so the next run starts over. It is
-// idempotent; removed reports whether there was anything to delete.
+// Reset removes persisted model files from dir.
 func Reset(dir string) (removed bool, err error) {
 	if dir == "" {
 		return false, errors.New("no model directory")
@@ -447,18 +381,8 @@ func (e *Engine) features(filename, repoName string) []float64 {
 	return f
 }
 
-// repoNameRank separates a project's primary artifact from the companion
-// binaries shipped beside it — the most common real ambiguity in the corpus:
-// atuin vs atuin-server, codex vs codex-app-server, hugo vs hugo_extended,
-// netbird vs netbird-ui, lockbook vs lockbook-cli, cloudflared vs
-// cloudflared-fips.
-//
-//	1.0  the name is the repo name followed straight by the platform
-//	0.5  the repo name is in there, but with extra words attached
-//	0.0  the repo name doesn't appear (or we don't have one)
+// repoNameRank ranks how closely filename matches repoName.
 func repoNameRank(lower, repoName string) float64 {
-	// strings.Contains(x, "") is true, so an empty repo name has to short-circuit
-	// or this feature would read 1 for every URL-based install.
 	if repoName == "" {
 		return 0
 	}
@@ -469,8 +393,6 @@ func repoNameRank(lower, repoName string) float64 {
 
 	parts := splitTokens(lower)
 	if len(parts) > len(repoParts) && slicesEqual(parts[:len(repoParts)], repoParts) {
-		// What follows the name decides: a platform word means this is the
-		// project itself, another name word means it's something shipped beside it.
 		if next := parts[len(repoParts)]; platformTokens[next] || isNumeric(next) {
 			return 1.0
 		}
@@ -481,9 +403,7 @@ func repoNameRank(lower, repoName string) float64 {
 	return 0
 }
 
-// variantTokens mark an asset as a secondary artifact: debug symbols, profiling
-// builds, hardware-specific builds, packaging by-products. Drawn from what
-// actually shows up in tie groups across the corpus.
+// variantTokens identifies secondary artifacts.
 var variantTokens = []string{
 	"debug", "dbg", "symbols", "syms", "profile", "baseline",
 	"src", "source", "sources", "vendor", "sbom", "package", "npm",
@@ -492,15 +412,11 @@ var variantTokens = []string{
 	"jetpack5", "jetpack6", "fips",
 }
 
-// platformTokens are the words that follow a project's name in a release asset:
-// operating system, architecture, toolchain and container format. They mark
-// where the project name ends and the platform description begins.
+// platformTokens identifies platform keywords.
 var platformTokens = map[string]bool{
-	// operating system
 	"linux": true, "windows": true, "win": true, "win32": true,
 	"win64": true, "freebsd": true, "netbsd": true, "openbsd": true,
 	"dragonfly": true, "solaris": true, "illumos": true, "android": true,
-	// architecture
 	"amd64": true, "x86": true, "x64": true, "i386": true, "i686": true,
 	"i586": true, "arm": true, "arm64": true, "aarch64": true, "armv6": true,
 	"armv7": true, "armv8": true, "armhf": true, "armel": true, "ppc64": true,
@@ -508,22 +424,18 @@ var platformTokens = map[string]bool{
 	"mips64": true, "mips64le": true, "riscv64": true, "loong64": true,
 	"universal": true, "universal2": true, "intel": true, "intel64": true,
 	"powerpc": true,
-	// toolchain / environment, as they appear in rust and zig target triples
-	"gnu": true, "gnueabi": true, "gnueabihf": true, "musl": true,
+	"gnu":     true, "gnueabi": true, "gnueabihf": true, "musl": true,
 	"musleabi": true, "musleabihf": true, "msvc": true, "mingw": true,
 	"mingw32": true, "mingw64": true, "unknown": true, "pc": true,
 	"none": true, "static": true,
-	// container format
 	"tar": true, "gz": true, "tgz": true, "zip": true, "bz2": true,
 	"tbz": true, "tbz2": true, "xz": true, "txz": true, "zst": true,
 	"tzst": true, "7z": true, "exe": true, "appimage": true, "deb": true,
 	"rpm": true, "dmg": true, "pkg": true, "msi": true, "bin": true,
 }
 
-// archiveKind classifies the container format. A bare executable is all false,
-// which is a distinct and meaningful combination.
+// archiveKind classifies the container format suffix.
 func archiveKind(lower string) (tarball, zip, exotic bool) {
-	// Longest suffix first: ".exe.tar.gz" and ".tar.gz.zip" both occur.
 	switch {
 	case hasAnySuffix(lower, ".tar.gz", ".tgz", ".tar"):
 		return true, false, false
@@ -559,19 +471,16 @@ func slicesEqual(a, b []string) bool {
 
 func isNumeric(s string) bool { return numericToken.MatchString(s) }
 
-// textScore is the classifier's probability that the name belongs to the Match
-// class, or 0.5 ("no opinion") before anything has been learned.
+// textScore returns the classifier probability for MatchClass.
 func (e *Engine) textScore(tokens []string) float64 {
 	if len(tokens) == 0 || e.classifier.Learned() == 0 {
 		return 0.5
 	}
-	// ErrUnderflow is deliberately ignored: the scores it comes with are
-	// recovered from the log domain, which is the more reliable of the two.
 	scores, _, _, _ := e.classifier.SafeProbScores(tokens)
 	if len(scores) == 0 {
 		return 0.5
 	}
-	return scores[0] // index 0 is MatchClass
+	return scores[0]
 }
 
 var (
@@ -579,17 +488,14 @@ var (
 	hashToken    = regexp.MustCompile(`^[0-9a-f]{7,}$`)
 )
 
-// splitTokens lowercases and splits on anything that isn't a letter or digit.
+// splitTokens returns alphanumeric tokens from name.
 func splitTokens(name string) []string {
 	return strings.FieldsFunc(strings.ToLower(name), func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
 	})
 }
 
-// tokenize produces the classifier's vocabulary. Version numbers, commit
-// hashes and single characters are dropped: they are unique per release, so
-// keeping them would grow the saved model without bound and dilute the tokens
-// that actually distinguish one asset from another.
+// tokenize extracts normalized vocabulary tokens from name.
 func tokenize(name string) []string {
 	fields := splitTokens(name)
 	out := make([]string, 0, len(fields))
@@ -605,7 +511,7 @@ func tokenize(name string) []string {
 	return out
 }
 
-// hasToken matches whole tokens, so "sources" doesn't fire on "resources".
+// hasToken reports whether name contains any of the target tokens.
 func hasToken(name string, want ...string) bool {
 	for _, t := range splitTokens(name) {
 		for _, w := range want {
@@ -633,15 +539,14 @@ func allFinite(xs []float64) bool {
 	return true
 }
 
-// writeFileAtomic writes data through a temporary file in the same directory
-// and renames it into place.
+// writeFileAtomic writes data to path using an atomic rename.
 func writeFileAtomic(path string, data []byte) error {
 	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
 	if err != nil {
 		return err
 	}
 	name := tmp.Name()
-	defer os.Remove(name) // no-op once the rename below succeeds
+	defer os.Remove(name)
 
 	if _, err := tmp.Write(data); err != nil {
 		tmp.Close()

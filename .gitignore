@@ -15,7 +15,7 @@
 # vendor/
 #
 
-bin
+geto
 
 /.vscode/
 /__debug_bin

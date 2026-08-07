@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"code.gitea.io/sdk/gitea"
-	"github.com/bresilla/bin/src/pkg/assets"
+	"github.com/bresilla/geto/src/pkg/assets"
 	"github.com/caarlos0/log"
 )
 
@@ -24,12 +24,10 @@ type codeberg struct {
 func (c *codeberg) Fetch(opts *FetchOpts) (*File, error) {
 	var release *gitea.Release
 
-	// If we have a tag, let's fetch from there
 	var err error
 	var resp *gitea.Response
 	if len(c.tag) > 0 || len(opts.Version) > 0 {
 		if len(opts.Version) > 0 {
-			// this is used by for the `ensure` command
 			c.tag = opts.Version
 		}
 		log.Debugf("Getting %s release for %s/%s", c.tag, c.owner, c.repo)
@@ -69,15 +67,13 @@ func (c *codeberg) Fetch(opts *FetchOpts) (*File, error) {
 
 	version := release.TagName
 
-	// TODO calculate file hash. Not sure if we can / should do it here
-	// since we don't want to read the file unnecesarily. Additionally, sometimes
-	// releases have .sha256 files, so it'd be nice to check for those also
+	// TODO: calculate and verify release asset SHA256 checksum.
 	file := &File{Data: outFile.Source, Name: outFile.Name, Version: version, PackagePath: outFile.PackagePath, PackageFingerprint: outFile.PackageFingerprint, SelectedAsset: assets.NormalizeAssetName(gf.Name), AssetFingerprint: gf.Fingerprint, Libs: outFile.Sidecars}
 
 	return file, nil
 }
 
-// GetDescription returns the repository's short description.
+// GetDescription returns the repository description.
 func (c *codeberg) GetDescription() (string, error) {
 	repo, _, err := c.client.GetRepo(c.owner, c.repo)
 	if err != nil {
@@ -86,8 +82,7 @@ func (c *codeberg) GetDescription() (string, error) {
 	return repo.Description, nil
 }
 
-// GetLatestVersion checks the latest repo release and
-// returns the corresponding name and url to fetch the version
+// GetLatestVersion returns the latest release tag and HTML URL.
 func (c *codeberg) GetLatestVersion() (string, string, error) {
 	log.Debugf("Getting latest release for %s/%s", c.owner, c.repo)
 	release, _, err := c.client.GetLatestRelease(c.owner, c.repo)
@@ -108,12 +103,8 @@ func newCodeberg(u *url.URL) (Provider, error) {
 		return nil, fmt.Errorf("error parsing Codeberg URL %s, can't find owner and repo", u.String())
 	}
 
-	// it's a specific releases URL
 	var tag string
 	if strings.Contains(u.Path, "/releases/") {
-		// For release and download URL's, the
-		// path is usually /releases/tag/v0.1
-		// or /releases/download/v0.1.
 		ps := strings.Split(u.Path, "/")
 		for i, p := range ps {
 			if p == "releases" {
@@ -125,7 +116,6 @@ func newCodeberg(u *url.URL) (Provider, error) {
 
 	token := os.Getenv("CODEBERG_TOKEN")
 
-	// Codeberg uses Gitea/Forgejo, use the Gitea SDK
 	baseURL := fmt.Sprintf("https://%s/", u.Hostname())
 
 	var client *gitea.Client

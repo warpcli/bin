@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bresilla/bin/src/pkg/config"
-	"github.com/bresilla/bin/src/pkg/ui"
+	"github.com/bresilla/geto/src/pkg/config"
+	"github.com/bresilla/geto/src/pkg/ui"
 	"github.com/caarlos0/log"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -29,7 +29,7 @@ func newRemoveCmd() *removeCmd {
 	cmd := &cobra.Command{
 		Use:           "remove [<name> | <paths...>]",
 		Aliases:       []string{"rm", "uninstall", "delete"},
-		Short:         "Removes binaries managed by bin",
+		Short:         "Removes binaries managed by geto",
 		SilenceUsage:  true,
 		Args:          cobra.MinimumNArgs(1),
 		SilenceErrors: true,
@@ -53,7 +53,7 @@ func newRemoveCmd() *removeCmd {
 					}
 				}
 				if match == nil {
-					log.Warnf("%s is not managed by bin, skipping", color.YellowString(p))
+					log.Warnf("%s is not managed by geto, skipping", color.YellowString(p))
 					continue
 				}
 				matches = append(matches, match)

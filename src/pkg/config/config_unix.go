@@ -8,16 +8,13 @@ import (
 	"os"
 	"strings"
 
-	"github.com/bresilla/bin/src/pkg/options"
+	"github.com/bresilla/geto/src/pkg/options"
 	"github.com/caarlos0/log"
 	"golang.org/x/sys/unix"
 )
 
-// getDefaultPath reads the user's PATH variable
-// and returns the first directory that's writable by the current
-// user in the system
-// TODO add feature to prompt the user which to select
-// if many paths are found
+// getDefaultPath returns a writable directory from PATH.
+// TODO: support selecting from multiple valid PATH entries.
 func getDefaultPath() (string, error) {
 	penv := os.Getenv("PATH")
 	log.Debugf("User PATH is [%s]", penv)
@@ -36,8 +33,7 @@ func getDefaultPath() (string, error) {
 
 	}
 
-	// TODO this logic is also duplicated in the windows config. We should
-	// move it to config.go
+	// TODO: move path selection logic to config.go.
 	if len(opts) == 0 {
 		return "", errors.New("Automatic path detection didn't return any results")
 	}
@@ -60,7 +56,7 @@ func checkDirExistsAndWritable(dir string) error {
 	} else if !fi.IsDir() {
 		return errors.New("Download path is not a directory")
 	}
-	// TODO make this work in non unix platforms
+	// TODO: support non-Unix platforms in checkDirExistsAndWritable.
 	err := unix.Access(dir, unix.W_OK)
 	return err
 }

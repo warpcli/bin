@@ -8,16 +8,15 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bresilla/bin/src/pkg/assets"
-	"github.com/bresilla/bin/src/pkg/config"
-	"github.com/bresilla/bin/src/pkg/providers"
-	"github.com/bresilla/bin/src/pkg/ui"
+	"github.com/bresilla/geto/src/pkg/assets"
+	"github.com/bresilla/geto/src/pkg/config"
+	"github.com/bresilla/geto/src/pkg/providers"
+	"github.com/bresilla/geto/src/pkg/ui"
 	"github.com/caarlos0/log"
 	"github.com/spf13/cobra"
 )
 
-// defaultBinName guesses a binary name from an install URL — the repository
-// name (e.g. "github.com/pythops/impala" -> "impala").
+// defaultBinName extracts the repository name from an installation URL.
 func defaultBinName(raw string) string {
 	s := raw
 	for _, p := range []string{"https://", "http://", "docker://", "goinstall://"} {
@@ -67,9 +66,7 @@ func newInstallCmd() *installCmd {
 				}
 
 			} else {
-				// Ask what to name the binary, defaulting to the repo name
-				// (so "github.com/pythops/impala" installs as "impala", not the
-				// mangled asset name).
+				// Prompts for binary destination name, defaulting to repo name.
 				name, err := ui.AskString("Install as:", packageName)
 				if err != nil {
 					return err
@@ -77,8 +74,7 @@ func newInstallCmd() *installCmd {
 				resolvedPath = filepath.Join(defaultPath, name)
 			}
 
-			// TODO check if binary already exists in config
-			// and triger the update process if that's the case
+			// TODO: trigger update if binary already exists in configuration.
 
 			p, err := providers.New(u, root.opts.provider)
 			if err != nil {
@@ -101,18 +97,11 @@ func newInstallCmd() *installCmd {
 				return fmt.Errorf("error installing binary: %w", err)
 			}
 
-			// Make the binary runnable on this host: rewrite a missing
-			// interpreter and install any bundled libs it needs. No-ops
-			// when nothing is broken. If it changed, persist the patched hash so
-			// a later ensure doesn't see a mismatch, and record the intent.
+			// Applies host patches for interpreter and libraries.
 			var patched bool
 			hash, patched = applyHostPatches(resolvedPath, pResult.Libs, !root.opts.noPatch, hash)
 
-			// Store an absolute path. If the path is already absolute once
-			// environment variables are expanded (e.g. "$HOME/.local/bin/foo"),
-			// keep that portable form as-is — running filepath.Abs on it would
-			// treat the unexpanded "$HOME/…" as relative and wrongly prepend the
-			// current directory.
+			// Converts unexpanded relative paths to absolute paths.
 			absPath := resolvedPath
 			if !filepath.IsAbs(os.ExpandEnv(resolvedPath)) {
 				absPath, err = filepath.Abs(resolvedPath)
@@ -156,14 +145,11 @@ func newInstallCmd() *installCmd {
 	return root
 }
 
-// checkFinalPath checks if path exists and if it's a dir or not
-// and returns the correct final file path. It also
-// checks if the path already exists and prompts
-// the user to override
+// checkFinalPath returns the destination path for fileName within path.
 func checkFinalPath(path, fileName string) (string, error) {
 	fi, err := os.Stat(os.ExpandEnv(path))
 
-	// TODO implement file existence and override logic
+	// TODO: handle file existence and override prompt.
 	if err != nil && !os.IsNotExist(err) {
 		return "", err
 	}
@@ -175,12 +161,9 @@ func checkFinalPath(path, fileName string) (string, error) {
 	return path, nil
 }
 
-// saveToDisk saves the specified binary to the desired path
-// and makes it executable. It also checks if any other binary
-// has the same hash and exists if so.
-
-// TODO check if other binary has the same hash and warn about it.
-// TODO if the file is zipped, tared, whatever then extract it
+// saveToDisk writes f to path with executable permissions and returns its SHA256 checksum.
+// TODO: warn if another binary matches hash.
+// TODO: extract archived payload before saving.
 func saveToDisk(f *providers.File, path string, overwrite bool) ([]byte, error) {
 	epath := os.ExpandEnv((path))
 	if err := os.MkdirAll(filepath.Dir(epath), 0o755); err != nil {

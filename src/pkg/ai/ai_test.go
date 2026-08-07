@@ -11,14 +11,14 @@ import (
 	"testing"
 )
 
-// selection is one user choice: what they picked, and what they passed over.
+// selection holds an asset choice and rejected candidates for testing.
 type selection struct {
 	repo     string
 	chosen   string
 	rejected []string
 }
 
-// muslSelections is a user who consistently prefers musl over gnu.
+// muslSelections provides test selections preferring musl over gnu.
 var muslSelections = []selection{
 	{"ripgrep", "ripgrep-14.1.0-x86_64-unknown-linux-musl.tar.gz", []string{"ripgrep-14.1.0-x86_64-unknown-linux-gnu.tar.gz"}},
 	{"fd", "fd-v10.2.0-x86_64-unknown-linux-musl.tar.gz", []string{"fd-v10.2.0-x86_64-unknown-linux-gnu.tar.gz"}},
@@ -34,8 +34,6 @@ func train(e *Engine, sels []selection) {
 	}
 }
 
-// Observe used to call bayesian.ConvertTermsFreqToTfIdf, which panics on the
-// second call. Two prompts in one run were enough to crash bin.
 func TestObserveRepeatedlyDoesNotPanic(t *testing.T) {
 	e := newEngine()
 	for i := 0; i < 50; i++ {
@@ -46,8 +44,6 @@ func TestObserveRepeatedlyDoesNotPanic(t *testing.T) {
 	}
 }
 
-// The panic flag was also persisted into the gob, so the first Observe of every
-// later run crashed too.
 func TestObserveAfterReloadDoesNotPanic(t *testing.T) {
 	dir := t.TempDir()
 
@@ -67,9 +63,6 @@ func TestObserveAfterReloadDoesNotPanic(t *testing.T) {
 	}
 }
 
-// nanonn seeds Dense layers from the global math/rand, which Go auto-seeds per
-// process. Without a fixed seed, a fresh install ranked assets differently on
-// every invocation.
 func TestFreshEnginesScoreIdentically(t *testing.T) {
 	names := []string{
 		"ripgrep-14.1.0-x86_64-unknown-linux-musl.tar.gz",
@@ -120,8 +113,6 @@ func TestSaveLoadPreservesScores(t *testing.T) {
 	}
 }
 
-// An untrained engine must decline, so a fresh install always prompts instead
-// of guessing from initial weights.
 func TestUntrainedEngineDeclinesToDecide(t *testing.T) {
 	e := newEngine()
 	names := []string{
@@ -150,15 +141,12 @@ func TestDecideNeedsMinSelections(t *testing.T) {
 	}
 }
 
-// The point of the whole package: a consistent preference should eventually be
-// applied to a repo the user has never chosen for.
 func TestLearnsPreferenceAndAppliesItToNewRepo(t *testing.T) {
 	e := newEngine()
 	for round := 0; round < 20; round++ {
 		train(e, muslSelections)
 	}
 
-	// "zoxide" appears in none of the training selections.
 	musl := "zoxide-x86_64-unknown-linux-musl.tar.gz"
 	gnu := "zoxide-x86_64-unknown-linux-gnu.tar.gz"
 
@@ -172,28 +160,22 @@ func TestLearnsPreferenceAndAppliesItToNewRepo(t *testing.T) {
 			best, musl, e.Score(musl, "zoxide"), e.Score(gnu, "zoxide"))
 	}
 
-	// Order of the candidates must not change the outcome.
 	if reversed, _ := e.Decide([]string{musl, gnu}, "zoxide"); reversed != best {
 		t.Fatalf("candidate order changed the winner: %q vs %q", best, reversed)
 	}
 }
 
-// Identical scores must not be resolved: whichever name happened to come first
-// would otherwise win, making the choice depend on input order.
 func TestDecideRejectsExactTies(t *testing.T) {
 	e := newEngine()
 	for round := 0; round < 20; round++ {
 		train(e, muslSelections)
 	}
-	// Same name twice guarantees identical feature vectors.
 	name := "ripgrep-14.1.0-x86_64-unknown-linux-musl.tar.gz"
 	if best, ok := e.Decide([]string{name, name}, "ripgrep"); ok {
 		t.Fatalf("resolved an exact tie to %q; want a prompt", best)
 	}
 }
 
-// strings.Contains(x, "") is true, which used to pin this feature to 1 for
-// every install that has no repo name (URL-based ones).
 func TestRepoFeatureIsZeroWithoutRepoName(t *testing.T) {
 	e := newEngine()
 	if got := e.features("whatever-linux-amd64.tar.gz", "")[fRepoRank]; got != 0 {
@@ -204,8 +186,6 @@ func TestRepoFeatureIsZeroWithoutRepoName(t *testing.T) {
 	}
 }
 
-// Features must actually differ between candidates the scorer rated equally,
-// otherwise the net has nothing to learn from.
 func TestFeaturesDiscriminateBetweenTiedCandidates(t *testing.T) {
 	e := newEngine()
 	pairs := [][2]string{
@@ -240,8 +220,6 @@ func TestTokenizeDropsPerReleaseNoise(t *testing.T) {
 	}
 }
 
-// Two releases of the same tool must tokenize identically, or the vocabulary
-// grows on every upgrade.
 func TestTokenizeIsStableAcrossVersions(t *testing.T) {
 	a := tokenize("ripgrep-14.1.0-x86_64-unknown-linux-musl.tar.gz")
 	b := tokenize("ripgrep-14.2.7-x86_64-unknown-linux-musl.tar.gz")
@@ -259,8 +237,6 @@ func TestHasTokenMatchesWholeTokensOnly(t *testing.T) {
 	}
 }
 
-// A corrupt or stale model must leave the engine untrained (so it prompts)
-// rather than half-loaded.
 func TestLoadRejectsBadModels(t *testing.T) {
 	good := newEngine()
 	train(good, muslSelections)
@@ -306,7 +282,6 @@ func TestLoadRejectsBadModels(t *testing.T) {
 			if e.Trained() {
 				t.Fatal("engine reports Trained() after a rejected model")
 			}
-			// The rejected load must not have moved the weights either.
 			fresh := newEngine()
 			if !reflect.DeepEqual(e.layer1.Weights(), fresh.layer1.Weights()) {
 				t.Error("hidden layer weights changed despite the rejected load")
@@ -315,9 +290,6 @@ func TestLoadRejectsBadModels(t *testing.T) {
 	}
 }
 
-// encoding/json cannot represent NaN or Inf, so a diverged net must be caught
-// before it reaches the encoder — otherwise saving fails forever with an opaque
-// error and the learning silently stops.
 func TestSaveRejectsNonFiniteWeights(t *testing.T) {
 	for name, bad := range map[string]float64{"NaN": math.NaN(), "+Inf": math.Inf(1), "-Inf": math.Inf(-1)} {
 		t.Run(name, func(t *testing.T) {
@@ -334,8 +306,6 @@ func TestSaveRejectsNonFiniteWeights(t *testing.T) {
 	}
 }
 
-// A diverged net must read as "no opinion", not slip through the gate on NaN
-// comparisons that are false in both directions.
 func TestNonFiniteWeightsDeclineToDecide(t *testing.T) {
 	e := newEngine()
 	for round := 0; round < 20; round++ {

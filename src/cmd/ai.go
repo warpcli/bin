@@ -4,9 +4,9 @@ import (
 	"errors"
 	"os"
 
-	"github.com/bresilla/bin/src/pkg/ai"
-	"github.com/bresilla/bin/src/pkg/assets"
-	"github.com/bresilla/bin/src/pkg/prompt"
+	"github.com/bresilla/geto/src/pkg/ai"
+	"github.com/bresilla/geto/src/pkg/assets"
+	"github.com/bresilla/geto/src/pkg/prompt"
 	"github.com/caarlos0/log"
 	"github.com/spf13/cobra"
 )
@@ -33,13 +33,13 @@ remembers the answer. Once it has learned from enough choices it resolves such
 ties on its own instead of asking. It never overrides a better-scoring asset —
 only equally-scored ones.
 
-Set BIN_NO_AI=1 to turn the whole thing off.`,
+Set GETO_NO_AI=1 to turn the whole thing off.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir := assets.AIModelDir()
 			if dir == "" {
-				log.Info("Asset-selection learning is off (BIN_NO_AI)")
+				log.Info("Asset-selection learning is off (GETO_NO_AI)")
 				return nil
 			}
 
@@ -78,7 +78,7 @@ Set BIN_NO_AI=1 to turn the whole thing off.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir := assets.AIModelDir()
 			if dir == "" {
-				log.Info("Asset-selection learning is off (BIN_NO_AI); nothing to reset")
+				log.Info("Asset-selection learning is off (GETO_NO_AI); nothing to reset")
 				return nil
 			}
 			if !root.opts.force {

@@ -1,16 +1,4 @@
-// Package elfpatch is a small, pure-Go reimplementation of the parts of patchelf
-// bin needs: changing an ELF's interpreter and its RPATH/RUNPATH — without
-// shelling out.
-//
-// Setting the interpreter supports both the in-place case and the "grow" case
-// (a longer path), because the Linux kernel reads PT_INTERP directly from the
-// file offset, so a longer interpreter can be appended at EOF and PT_INTERP
-// re-pointed at it without relocating program headers.
-//
-// Setting RPATH/RUNPATH is in-place when the new value fits the existing string;
-// otherwise it grows the binary by appending a fresh .dynstr (old strings +
-// the new rpath) and mapping it through a repurposed PT_NOTE -> PT_LOAD segment,
-// then repointing DT_STRTAB/DT_STRSZ and a DT_RUNPATH entry at it.
+// Package elfpatch modifies ELF interpreters, RPATHs, and RUNPATHs.
 package elfpatch
 
 import (
@@ -21,11 +9,10 @@ import (
 	"os"
 )
 
-// ErrNeedsGrow is returned when an operation can't be done in place and the
-// (not-yet-implemented) relocation path would be required.
+// ErrNeedsGrow indicates an ELF operation requires segment relocation.
 var ErrNeedsGrow = fmt.Errorf("value longer than existing slot (segment relocation required)")
 
-// elfImage is a mutable in-memory ELF64 little-endian image.
+// elfImage represents an in-memory 64-bit little-endian ELF image.
 type elfImage struct {
 	data      []byte
 	mode      os.FileMode
@@ -49,10 +36,10 @@ func load(path string) (*elfImage, error) {
 	if len(data) < 64 || !bytes.Equal(data[:4], []byte("\x7fELF")) {
 		return nil, fmt.Errorf("not an ELF file")
 	}
-	if data[4] != 2 { // EI_CLASS: 2 = ELFCLASS64
+	if data[4] != 2 {
 		return nil, fmt.Errorf("only 64-bit ELF is supported")
 	}
-	if data[5] != 1 { // EI_DATA: 1 = little-endian
+	if data[5] != 1 {
 		return nil, fmt.Errorf("only little-endian ELF is supported")
 	}
 	img := &elfImage{
@@ -75,7 +62,7 @@ func (img *elfImage) write(path string) error {
 	return os.WriteFile(path, img.data, img.mode.Perm())
 }
 
-// field offsets within a 64-bit program header entry.
+// Field offsets within a 64-bit program header entry.
 const (
 	pType   = 0
 	pFlags  = 4
@@ -87,7 +74,7 @@ const (
 	pAlign  = 48
 )
 
-// field offsets within a 64-bit section header entry.
+// Field offsets within a 64-bit section header entry.
 const (
 	shAddr   = 16
 	shOffset = 24
@@ -109,7 +96,7 @@ func (img *elfImage) setProgU32(i, field int, v uint32) {
 	binary.LittleEndian.PutUint32(img.data[img.progOff(i)+field:], v)
 }
 
-// findProg returns the index of the first program header of the given type, or -1.
+// findProg returns the index of the first program header of type t, or -1.
 func (img *elfImage) findProg(t elf.ProgType) int {
 	for i := 0; i < img.phnum; i++ {
 		if elf.ProgType(img.progU32(i, pType)) == t {
@@ -119,7 +106,7 @@ func (img *elfImage) findProg(t elf.ProgType) int {
 	return -1
 }
 
-// vaddrToOff maps a virtual address into a file offset via the PT_LOAD segments.
+// vaddrToOff maps virtual address v to a file offset using PT_LOAD segments.
 func (img *elfImage) vaddrToOff(v uint64) (uint64, bool) {
 	for i := 0; i < img.phnum; i++ {
 		if elf.ProgType(img.progU32(i, pType)) != elf.PT_LOAD {
@@ -134,7 +121,7 @@ func (img *elfImage) vaddrToOff(v uint64) (uint64, bool) {
 	return 0, false
 }
 
-// maxLoadVaddrEnd returns the highest mapped virtual address end across PT_LOADs.
+// maxLoadVaddrEnd returns the highest end address across all PT_LOAD segments.
 func (img *elfImage) maxLoadVaddrEnd() uint64 {
 	var end uint64
 	for i := 0; i < img.phnum; i++ {
@@ -148,8 +135,7 @@ func (img *elfImage) maxLoadVaddrEnd() uint64 {
 	return end
 }
 
-// setSectionByAddr updates the offset/size/addr of the section whose sh_addr
-// matches addr (used to keep the .dynstr section view consistent after a move).
+// setSectionByAddr updates section header fields matching address addr.
 func (img *elfImage) setSectionByAddr(addr, newOff, newSize, newAddr uint64) {
 	if img.shoff == 0 {
 		return
@@ -168,9 +154,7 @@ func (img *elfImage) setSectionByAddr(addr, newOff, newSize, newAddr uint64) {
 	}
 }
 
-// SetInterpreter sets the ELF interpreter, in place when the new path fits the
-// existing PT_INTERP slot, otherwise by appending it at EOF and re-pointing
-// PT_INTERP (which the kernel reads straight from the file offset).
+// SetInterpreter sets the ELF interpreter path for the binary at path.
 func SetInterpreter(path, interp string) error {
 	img, err := load(path)
 	if err != nil {
@@ -186,12 +170,12 @@ func SetInterpreter(path, interp string) error {
 	size := img.progU64(i, pFilesz)
 
 	if uint64(len(val)) <= size {
-		// in place: overwrite, NUL-pad the remainder of the slot
+		// Overwrites the existing slot.
 		buf := make([]byte, size)
 		copy(buf, val)
 		copy(img.data[off:off+size], buf)
 	} else {
-		// grow: append at EOF and re-point PT_INTERP
+		// Appends the interpreter path at EOF.
 		newOff := uint64(len(img.data))
 		img.data = append(img.data, val...)
 		img.setProgU64(i, pOffset, newOff)
@@ -220,7 +204,7 @@ func Interpreter(path string) (string, error) {
 	return "", fmt.Errorf("no interpreter")
 }
 
-// Runpath returns the binary's RUNPATH (preferred) or RPATH entries.
+// Runpath returns the binary's RUNPATH or RPATH entries.
 func Runpath(path string) ([]string, error) {
 	f, err := elf.Open(path)
 	if err != nil {
@@ -233,10 +217,7 @@ func Runpath(path string) ([]string, error) {
 	return f.DynString(elf.DT_RPATH)
 }
 
-// SetRunpath sets the binary's DT_RUNPATH. It overwrites an existing
-// RUNPATH/RPATH in place when the new value fits; otherwise (longer value, or
-// none present) it grows the binary by appending a new .dynstr and mapping it
-// via a repurposed PT_NOTE segment.
+// SetRunpath sets the DT_RUNPATH entry for the binary at path.
 func SetRunpath(path, rpath string) error {
 	err := setRunpathInPlace(path, rpath)
 	if err == nil || !errorsIsGrow(err) {
@@ -295,18 +276,15 @@ func setRunpathInPlace(path, rpath string) error {
 		return err
 	}
 	defer fh.Close()
-	buf := make([]byte, len(old)+1) // NUL-padded
+	buf := make([]byte, len(old)+1)
 	copy(buf, rpath)
 	_, err = fh.WriteAt(buf, int64(strOff)+int64(idx))
 	return err
 }
 
-// dynamic-section tag values (subset).
 const dynEntSize = 16
 
-// setRunpathGrow appends a new .dynstr containing the rpath, maps it via a
-// repurposed PT_NOTE -> PT_LOAD segment, and repoints DT_STRTAB/DT_STRSZ and a
-// DT_RUNPATH entry (reusing DT_RPATH or a spare DT_NULL slot) at it.
+// setRunpathGrow appends a new .dynstr section containing rpath and repoints dynamic entries.
 func setRunpathGrow(path, rpath string) error {
 	img, err := load(path)
 	if err != nil {
@@ -367,10 +345,9 @@ func setRunpathGrow(path, rpath string) error {
 	base := (img.maxLoadVaddrEnd() + align - 1) / align * align
 	vaddr := base + (fileOff % align)
 
-	// append the new string table
 	img.data = append(img.data, newStr...)
 
-	// repurpose PT_NOTE as a read-only PT_LOAD covering the new .dynstr
+	// Repurposes PT_NOTE as a read-only PT_LOAD segment.
 	img.setProgU32(ni, pType, uint32(elf.PT_LOAD))
 	img.setProgU32(ni, pFlags, uint32(elf.PF_R))
 	img.setProgU64(ni, pOffset, fileOff)
@@ -380,7 +357,7 @@ func setRunpathGrow(path, rpath string) error {
 	img.setProgU64(ni, pMemsz, uint64(len(newStr)))
 	img.setProgU64(ni, pAlign, align)
 
-	// repoint DT_STRTAB/DT_STRSZ and set DT_RUNPATH
+	// Repoints DT_STRTAB, DT_STRSZ, and DT_RUNPATH.
 	setVal := func(k int, v uint64) {
 		binary.LittleEndian.PutUint64(img.data[dynOff+k*dynEntSize+8:], v)
 	}
@@ -395,14 +372,14 @@ func setRunpathGrow(path, rpath string) error {
 	case idxRpath >= 0:
 		setTag(idxRpath, elf.DT_RUNPATH)
 		setVal(idxRpath, rpathOff)
-	case idxNull >= 0 && idxNull < nEnt-1: // keep a terminating DT_NULL after it
+	case idxNull >= 0 && idxNull < nEnt-1:
 		setTag(idxNull, elf.DT_RUNPATH)
 		setVal(idxNull, rpathOff)
 	default:
 		return fmt.Errorf("no spare dynamic slot for DT_RUNPATH: %w", ErrNeedsGrow)
 	}
 
-	// keep the .dynstr section header consistent with its new home
+	// Updates the .dynstr section header.
 	img.setSectionByAddr(strtabVaddr, fileOff, uint64(len(newStr)), vaddr)
 
 	return img.write(path)

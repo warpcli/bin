@@ -7,15 +7,13 @@ import (
 	"os"
 	"strings"
 
-	"github.com/bresilla/bin/src/pkg/ui"
+	"github.com/bresilla/geto/src/pkg/ui"
 	"golang.org/x/term"
 )
 
 var stdin io.Reader = os.Stdin
 
-// Confirm prints a confirmation prompt for the given message and waits for the
-// user's input. On a real terminal it uses the styled Bubble Tea confirm;
-// otherwise it falls back to reading a line from stdin.
+// Confirm prompts for user confirmation.
 func Confirm(message string) error {
 	if term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
 		ok, err := ui.Confirm(message, true)

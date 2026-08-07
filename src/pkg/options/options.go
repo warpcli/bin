@@ -3,7 +3,7 @@ package options
 import (
 	"fmt"
 
-	"github.com/bresilla/bin/src/pkg/ui"
+	"github.com/bresilla/geto/src/pkg/ui"
 )
 
 type LiteralStringer string
@@ -12,8 +12,7 @@ func (l LiteralStringer) String() string {
 	return string(l)
 }
 
-// Select prompts the user to choose one of the available options and returns
-// the selected one.
+// Select prompts for a selection from opts.
 func Select(msg string, opts []fmt.Stringer) (interface{}, error) {
 	if len(opts) == 1 {
 		return opts[0], nil
@@ -29,8 +28,7 @@ func Select(msg string, opts []fmt.Stringer) (interface{}, error) {
 	return opts[idx], nil
 }
 
-// SelectCustom prompts the user to choose one of the available options or type
-// a custom value, returning the selected option or a LiteralStringer.
+// SelectCustom prompts for a selection from opts or custom input.
 func SelectCustom(msg string, opts []fmt.Stringer) (interface{}, error) {
 	if len(opts) == 1 {
 		return opts[0], nil

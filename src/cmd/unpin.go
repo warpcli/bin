@@ -3,7 +3,7 @@ package cmd
 import (
 	"strings"
 
-	"github.com/bresilla/bin/src/pkg/config"
+	"github.com/bresilla/geto/src/pkg/config"
 	"github.com/caarlos0/log"
 	"github.com/spf13/cobra"
 )
@@ -26,7 +26,6 @@ func newUnpinCmd() *unpinCmd {
 
 			binsToUnpin := map[string]*config.Binary{}
 
-			// To unpin
 			if len(args) > 0 {
 				for _, a := range args {
 					bin, err := getBinPath(a)
@@ -41,7 +40,6 @@ func newUnpinCmd() *unpinCmd {
 
 			unpinned := []string{}
 
-			// Unpinning
 			for name, bin := range binsToUnpin {
 				bin.Pinned = false
 				err := config.UpsertBinary(bin)

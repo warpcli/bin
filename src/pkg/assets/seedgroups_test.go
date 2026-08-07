@@ -10,20 +10,6 @@ import (
 	"testing"
 )
 
-// This file is the first half of the seed-model generator. It turns a corpus of
-// real release-asset names into labelled tie groups:
-//
-//	seed/corpus.json  --(this file)-->  seed/groups.json  --(ai/seedgen_test.go)-->  seed/model.json
-//
-// It lives in package assets because it must use the real scorer to find real
-// ties — reimplementing that logic would let the training data drift away from
-// what bin actually asks about. Regenerate with:
-//
-//	BIN_GENERATE_SEED=1 go test ./src/pkg/assets -run TestGenerateSeedGroups
-//
-// The labels come from the rule set in oracleScore below, not from user
-// selections, so seed/groups.json is committed to make every label reviewable.
-
 const (
 	corpusPath = "../ai/seed/corpus.json"
 	groupsPath = "../ai/seed/groups.json"
@@ -35,8 +21,7 @@ type seedCorpusRepo struct {
 	Assets []string `json:"assets"`
 }
 
-// seedGroup is one labelled tie group. Chosen is empty when the group's
-// remaining candidates are a genuine toss-up; Rejected is still meaningful.
+// seedGroup represents a labelled tie group.
 type seedGroup struct {
 	Repo     string   `json:"repo"`
 	Platform string   `json:"platform"`
@@ -45,9 +30,6 @@ type seedGroup struct {
 	Note     string   `json:"note,omitempty"`
 }
 
-// seedPlatforms mirrors config.GetOS/GetArch exactly, for every platform bin
-// ships. Using a made-up alias list here would manufacture ties that bin never
-// actually sees.
 var seedPlatforms = []struct {
 	name string
 	res  *mockOSResolver
@@ -58,8 +40,8 @@ var seedPlatforms = []struct {
 }
 
 func TestGenerateSeedGroups(t *testing.T) {
-	if os.Getenv("BIN_GENERATE_SEED") == "" {
-		t.Skip("set BIN_GENERATE_SEED=1 to regenerate " + groupsPath)
+	if os.Getenv("GETO_GENERATE_SEED") == "" {
+		t.Skip("set GETO_GENERATE_SEED=1 to regenerate " + groupsPath)
 	}
 
 	corpus := loadSeedCorpus(t)

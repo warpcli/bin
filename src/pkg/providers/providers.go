@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/bresilla/bin/src/pkg/assets"
+	"github.com/bresilla/geto/src/pkg/assets"
 )
 
 var ErrInvalidProvider = errors.New("invalid provider")
@@ -20,16 +20,13 @@ type File struct {
 	Version     string
 	Length      int64
 	PackagePath string
-	// SelectedAsset is the version-normalized name of the chosen release asset
-	// and AssetFingerprint the normalized set of installable assets seen, so
-	// the caller can persist them and avoid re-prompting on future updates.
-	SelectedAsset    string
+	// SelectedAsset holds the version-normalized name of the chosen release asset.
+	SelectedAsset string
+	// AssetFingerprint holds the normalized set of installable assets.
 	AssetFingerprint []string
-	// PackageFingerprint is the normalized set of installable files seen inside
-	// the archive, persisted so the inner-file choice can be reused too.
+	// PackageFingerprint holds the normalized set of inner-archive files.
 	PackageFingerprint []string
-	// Libs holds the binary's shared-library dependency closure extracted from
-	// the same archive (keyed by basename), when CollectLibs was requested.
+	// Libs holds extracted shared-library sidecar dependencies.
 	Libs map[string]*assets.Sidecar
 }
 
@@ -47,37 +44,34 @@ type FetchOpts struct {
 	PackagePath    string
 	SkipPatchCheck bool
 	Version        string
-	// SelectedAsset / AssetFingerprint carry the previously remembered choice
-	// so providers can reuse it. Recheck forces a fresh prompt.
-	SelectedAsset    string
+	// SelectedAsset carries the remembered asset choice.
+	SelectedAsset string
+	// AssetFingerprint carries the remembered set of assets.
 	AssetFingerprint []string
 	Recheck          bool
-	// WantedAsset / WantedPackagePath are declarative exact choices for
-	// noninteractive callers.
-	WantedAsset       string
+	// WantedAsset specifies an exact asset choice.
+	WantedAsset string
+	// WantedPackagePath specifies an exact package path choice.
 	WantedPackagePath string
 	// PackageFingerprint carries the remembered inner-archive file set.
 	PackageFingerprint []string
-	// NonInteractive makes asset selection fail instead of prompting.
+	// NonInteractive fails when interactive selection is required.
 	NonInteractive bool
-	// CollectLibs requests extraction of the binary's shared-library closure.
+	// CollectLibs enables extraction of shared-library dependencies.
 	CollectLibs bool
 }
 
 type Provider interface {
-	// Fetch returns the file metadata to retrieve a specific binary given
-	// for a provider
+	// Fetch returns the file metadata for the provider.
 	Fetch(*FetchOpts) (*File, error)
-	// GetLatestVersion returns the version and the URL of the
-	// latest version for this binary
+	// GetLatestVersion returns the latest version tag and download URL.
 	GetLatestVersion() (string, string, error)
 
-	// GetID returns the unique identiifer of this provider
+	// GetID returns the unique provider identifier.
 	GetID() string
 }
 
-// Describer is an optional capability for providers that can return the
-// upstream repository's one-line description.
+// Describer provides the repository's short description.
 type Describer interface {
 	GetDescription() (string, error)
 }

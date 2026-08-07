@@ -23,12 +23,12 @@ func resetConfigTestState(t *testing.T, uid int) {
 	})
 
 	for _, name := range []string{
-		"BIN_CONFIG_FILE",
-		"BIN_CONFIG_HOME",
-		"BIN_STATE_FILE",
-		"BIN_STATE_HOME",
-		"BIN_DEFAULT_PATH",
-		"BIN_NONINTERACTIVE",
+		"GETO_CONFIG_FILE",
+		"GETO_CONFIG_HOME",
+		"GETO_STATE_FILE",
+		"GETO_STATE_HOME",
+		"GETO_DEFAULT_PATH",
+		"GETO_NONINTERACTIVE",
 		"XDG_CONFIG_HOME",
 		"XDG_STATE_HOME",
 		"XDG_DATA_HOME",
@@ -90,8 +90,8 @@ func TestPathOverridesForDeclarativeIntegrations(t *testing.T) {
 	configFile := filepath.Join(tmp, "cfg", "list.json")
 	stateFile := filepath.Join(tmp, "state", "state.json")
 
-	t.Setenv("BIN_CONFIG_FILE", configFile)
-	t.Setenv("BIN_STATE_FILE", stateFile)
+	t.Setenv("GETO_CONFIG_FILE", configFile)
+	t.Setenv("GETO_STATE_FILE", stateFile)
 
 	gotConfig, err := getConfigPath()
 	if err != nil {
@@ -113,10 +113,10 @@ func TestPathOverridesForDeclarativeIntegrations(t *testing.T) {
 func TestNonInteractiveDefaultPathFromEnvironment(t *testing.T) {
 	resetConfigTestState(t, 1000)
 	tmp := t.TempDir()
-	t.Setenv("BIN_CONFIG_FILE", filepath.Join(tmp, "list.json"))
-	t.Setenv("BIN_STATE_FILE", filepath.Join(tmp, "state.json"))
-	t.Setenv("BIN_DEFAULT_PATH", filepath.Join(tmp, "bin"))
-	t.Setenv("BIN_NONINTERACTIVE", "1")
+	t.Setenv("GETO_CONFIG_FILE", filepath.Join(tmp, "list.json"))
+	t.Setenv("GETO_STATE_FILE", filepath.Join(tmp, "state.json"))
+	t.Setenv("GETO_DEFAULT_PATH", filepath.Join(tmp, "bin"))
+	t.Setenv("GETO_NONINTERACTIVE", "1")
 	cfg = config{}
 
 	if err := CheckAndLoad(); err != nil {
@@ -133,10 +133,10 @@ func TestExplicitConfigPathDoesNotMergeSiblingJSON(t *testing.T) {
 	configFile := filepath.Join(tmp, "list.json")
 	sibling := filepath.Join(tmp, "desired.json")
 
-	t.Setenv("BIN_CONFIG_FILE", configFile)
-	t.Setenv("BIN_STATE_FILE", filepath.Join(tmp, "state.json"))
-	t.Setenv("BIN_DEFAULT_PATH", filepath.Join(tmp, "bin"))
-	t.Setenv("BIN_NONINTERACTIVE", "1")
+	t.Setenv("GETO_CONFIG_FILE", configFile)
+	t.Setenv("GETO_STATE_FILE", filepath.Join(tmp, "state.json"))
+	t.Setenv("GETO_DEFAULT_PATH", filepath.Join(tmp, "bin"))
+	t.Setenv("GETO_NONINTERACTIVE", "1")
 	cfg = config{}
 
 	if err := os.WriteFile(sibling, []byte(`{"not":"a bin manifest"}`), 0o644); err != nil {
@@ -161,10 +161,10 @@ func TestStateDescriptionOverlaysDeclarativeManifest(t *testing.T) {
 	installDir := filepath.Join(tmp, "bin")
 	binPath := filepath.Join(installDir, "mdbook")
 
-	t.Setenv("BIN_CONFIG_FILE", configFile)
-	t.Setenv("BIN_STATE_FILE", stateFile)
-	t.Setenv("BIN_DEFAULT_PATH", installDir)
-	t.Setenv("BIN_NONINTERACTIVE", "1")
+	t.Setenv("GETO_CONFIG_FILE", configFile)
+	t.Setenv("GETO_STATE_FILE", stateFile)
+	t.Setenv("GETO_DEFAULT_PATH", installDir)
+	t.Setenv("GETO_NONINTERACTIVE", "1")
 	cfg = config{}
 
 	if err := os.WriteFile(configFile, []byte(`{
@@ -220,7 +220,7 @@ func TestUserDefaultPathsUseXDGConfigAndState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getConfigPath: %v", err)
 	}
-	if want := filepath.Join(tmp, ".config", "bin", "list.json"); configPath != want {
+	if want := filepath.Join(tmp, ".config", "geto", "list.json"); configPath != want {
 		t.Fatalf("config path = %q, want %q", configPath, want)
 	}
 
@@ -228,7 +228,7 @@ func TestUserDefaultPathsUseXDGConfigAndState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getStatePath: %v", err)
 	}
-	if want := filepath.Join(tmp, ".local", "state", "bin", "config.state.json"); statePath != want {
+	if want := filepath.Join(tmp, ".local", "state", "geto", "config.state.json"); statePath != want {
 		t.Fatalf("state path = %q, want %q", statePath, want)
 	}
 
@@ -238,7 +238,7 @@ func TestUserDefaultPathsUseXDGConfigAndState(t *testing.T) {
 	if want := filepath.Join(tmp, ".local", "bin"); cfg.DefaultPath != want {
 		t.Fatalf("DefaultPath = %q, want %q", cfg.DefaultPath, want)
 	}
-	for _, dir := range []string{filepath.Join(tmp, ".local", "bin"), filepath.Join(tmp, ".local", "state", "bin")} {
+	for _, dir := range []string{filepath.Join(tmp, ".local", "bin"), filepath.Join(tmp, ".local", "state", "geto")} {
 		if st, err := os.Stat(dir); err != nil || !st.IsDir() {
 			t.Fatalf("expected directory %s to exist, stat=%v err=%v", dir, st, err)
 		}
@@ -254,7 +254,7 @@ func TestSystemDefaultPathsDoNotUseRootHome(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getConfigPath: %v", err)
 	}
-	if configPath != "/etc/bin/list.json" {
+	if configPath != "/etc/geto/list.json" {
 		t.Fatalf("config path = %q", configPath)
 	}
 
@@ -262,7 +262,7 @@ func TestSystemDefaultPathsDoNotUseRootHome(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getStatePath: %v", err)
 	}
-	if statePath != "/var/lib/bin/config.state.json" {
+	if statePath != "/var/lib/geto/config.state.json" {
 		t.Fatalf("state path = %q", statePath)
 	}
 
@@ -278,13 +278,13 @@ func TestSystemDefaultPathsDoNotUseRootHome(t *testing.T) {
 func TestRootEnvOverridesAllowManagedTempPaths(t *testing.T) {
 	resetConfigTestState(t, 0)
 	tmp := t.TempDir()
-	configFile := filepath.Join(tmp, "etc", "bin", "list.json")
-	stateFile := filepath.Join(tmp, "var", "lib", "bin", "config.state.json")
+	configFile := filepath.Join(tmp, "etc", "geto", "list.json")
+	stateFile := filepath.Join(tmp, "var", "lib", "geto", "config.state.json")
 	installDir := filepath.Join(tmp, "usr", "local", "bin")
 
-	t.Setenv("BIN_CONFIG_FILE", configFile)
-	t.Setenv("BIN_STATE_FILE", stateFile)
-	t.Setenv("BIN_DEFAULT_PATH", installDir)
+	t.Setenv("GETO_CONFIG_FILE", configFile)
+	t.Setenv("GETO_STATE_FILE", stateFile)
+	t.Setenv("GETO_DEFAULT_PATH", installDir)
 
 	if err := CheckAndLoad(); err != nil {
 		t.Fatalf("CheckAndLoad: %v", err)
@@ -305,9 +305,9 @@ func TestPathlessManifestUsesDefaultPath(t *testing.T) {
 	configFile := filepath.Join(tmp, "list.json")
 	installDir := filepath.Join(tmp, "bin")
 
-	t.Setenv("BIN_CONFIG_FILE", configFile)
-	t.Setenv("BIN_STATE_FILE", filepath.Join(tmp, "state.json"))
-	t.Setenv("BIN_DEFAULT_PATH", installDir)
+	t.Setenv("GETO_CONFIG_FILE", configFile)
+	t.Setenv("GETO_STATE_FILE", filepath.Join(tmp, "state.json"))
+	t.Setenv("GETO_DEFAULT_PATH", installDir)
 
 	if err := os.WriteFile(configFile, []byte(`{
 		"default_path": "`+installDir+`",
@@ -339,8 +339,8 @@ func TestSystemConfigRejectsHomeExpansionPaths(t *testing.T) {
 	tmp := t.TempDir()
 	configFile := filepath.Join(tmp, "list.json")
 
-	t.Setenv("BIN_CONFIG_FILE", configFile)
-	t.Setenv("BIN_STATE_FILE", filepath.Join(tmp, "state.json"))
+	t.Setenv("GETO_CONFIG_FILE", configFile)
+	t.Setenv("GETO_STATE_FILE", filepath.Join(tmp, "state.json"))
 	t.Setenv("HOME", filepath.Join(tmp, "root"))
 
 	if err := os.WriteFile(configFile, []byte(`{
@@ -363,7 +363,7 @@ func TestLegacyShareStateMigratesToXDGState(t *testing.T) {
 	resetConfigTestState(t, 1000)
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
-	configFile := filepath.Join(tmp, ".config", "bin", "list.json")
+	configFile := filepath.Join(tmp, ".config", "geto", "list.json")
 	legacyStateFile := filepath.Join(tmp, ".local", "share", "bin", "list.state.json")
 	binPath := filepath.Join(tmp, ".local", "bin", "fd")
 
@@ -405,7 +405,7 @@ func TestLegacyShareStateMigratesToXDGState(t *testing.T) {
 	if cfg.Bins[binPath].Version != "v10.0.0" {
 		t.Fatalf("legacy state was not loaded: %+v", cfg.Bins[binPath])
 	}
-	newStateFile := filepath.Join(tmp, ".local", "state", "bin", "config.state.json")
+	newStateFile := filepath.Join(tmp, ".local", "state", "geto", "config.state.json")
 	if _, err := os.Stat(newStateFile); err != nil {
 		t.Fatalf("new state file was not written: %v", err)
 	}

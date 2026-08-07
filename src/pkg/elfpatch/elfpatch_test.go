@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -120,7 +121,7 @@ func TestSetInterpreterGrowAndExec(t *testing.T) {
 		t.Skip("symlink not longer than original interp")
 	}
 
-	cp := dir + "/prog"
+	cp := filepath.Join(dir, filepath.Base(src))
 	copyFile(t, src, cp)
 	_ = os.Chmod(cp, 0o755)
 
@@ -152,7 +153,7 @@ func TestSetRunpathGrowAndExec(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	cp := dir + "/prog"
+	cp := filepath.Join(dir, filepath.Base(src))
 	copyFile(t, src, cp)
 	_ = os.Chmod(cp, 0o755)
 

@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-// gnuPicks is a user who consistently disagrees with the seed's musl preference.
+// gnuPicks provides test selections preferring gnu over musl.
 var gnuPicks = []selection{
 	{"fd", "fd-x86_64-unknown-linux-gnu.tar.gz", []string{"fd-x86_64-unknown-linux-musl.tar.gz"}},
 	{"bat", "bat-x86_64-unknown-linux-gnu.tar.gz", []string{"bat-x86_64-unknown-linux-musl.tar.gz"}},
@@ -12,17 +12,11 @@ var gnuPicks = []selection{
 	{"jj", "jj-x86_64-unknown-linux-gnu.tar.gz", []string{"jj-x86_64-unknown-linux-musl.tar.gz"}},
 }
 
-// Learning has to survive the real lifecycle: every `bin` invocation is a new
-// process that loads the embedded seed, overlays the model on disk, learns from
-// one selection, and saves. An earlier version of this test trained a single
-// long-lived engine, which hid the fact that the on-disk round trip is where
-// accumulation can silently stop.
 func TestUserLearningAccumulatesAcrossRuns(t *testing.T) {
 	dir := t.TempDir()
 	musl := "someapp-x86_64-unknown-linux-musl.tar.gz"
 	gnu := "someapp-x86_64-unknown-linux-gnu.tar.gz"
 
-	// One simulated `bin` run: fresh process, seed + disk, learn, save.
 	run := func() *Engine {
 		e := NewEngine()
 		if err := e.Load(dir); err != nil && e.Selections() != 0 {
@@ -42,7 +36,6 @@ func TestUserLearningAccumulatesAcrossRuns(t *testing.T) {
 		return e
 	}
 
-	// The seed starts out backing musl, decisively enough to skip the prompt.
 	fresh := NewEngine()
 	if fresh.Score(musl, "someapp") <= fresh.Score(gnu, "someapp") {
 		t.Fatal("precondition: the seed should prefer musl")
@@ -64,8 +57,6 @@ func TestUserLearningAccumulatesAcrossRuns(t *testing.T) {
 	}
 	t.Logf("user preference overtook the seed after %d selections", flippedAt)
 
-	// Keep going: the preference must become decisive, not just marginal, so the
-	// prompt eventually goes away again.
 	for round := 0; round < 40; round++ {
 		run()
 	}
@@ -82,9 +73,6 @@ func TestUserLearningAccumulatesAcrossRuns(t *testing.T) {
 		e.Selections(), e.Score(musl, "someapp"), e.Score(gnu, "someapp"))
 }
 
-// While the user's preference and the seed's disagree, the engine must abstain
-// rather than confidently apply either one — that is the window in which the
-// prompt comes back and the disagreement gets resolved.
 func TestEngineAbstainsWhileUserAndSeedDisagree(t *testing.T) {
 	dir := t.TempDir()
 	musl := "someapp-x86_64-unknown-linux-musl.tar.gz"

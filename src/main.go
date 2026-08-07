@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/bresilla/bin/src/cmd"
+	"github.com/bresilla/geto/src/cmd"
 )
 
 // nolint: gochecknoglobals
 var (
-	version = "0.3.0"
+	version = "0.4.0"
 	commit  = ""
 	date    = ""
 	builtBy = ""
