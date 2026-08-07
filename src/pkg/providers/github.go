@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/bresilla/bin/src/pkg/assets"
+	"github.com/bresilla/geto/src/pkg/assets"
 	"github.com/caarlos0/log"
 	"github.com/google/go-github/v31/github"
 	"golang.org/x/oauth2"

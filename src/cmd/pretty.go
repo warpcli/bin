@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/bresilla/bin/src/pkg/ui"
+	"github.com/bresilla/geto/src/pkg/ui"
 )
 
 // sep prints a full-width separator line.

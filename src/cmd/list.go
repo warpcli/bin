@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/bresilla/bin/src/pkg/config"
-	"github.com/bresilla/bin/src/pkg/ui"
+	"github.com/bresilla/geto/src/pkg/config"
+	"github.com/bresilla/geto/src/pkg/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +21,7 @@ func newListCmd() *listCmd {
 	cmd := &cobra.Command{
 		Use:           "list",
 		Aliases:       []string{"ls", "l"},
-		Short:         "List binaries managed by bin",
+		Short:         "List binaries managed by geto",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {

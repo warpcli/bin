@@ -17,11 +17,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/bresilla/bin/src/pkg/ai"
-	"github.com/bresilla/bin/src/pkg/config"
-	"github.com/bresilla/bin/src/pkg/options"
-	bstrings "github.com/bresilla/bin/src/pkg/strings"
-	"github.com/bresilla/bin/src/pkg/ui"
+	"github.com/bresilla/geto/src/pkg/ai"
+	"github.com/bresilla/geto/src/pkg/config"
+	"github.com/bresilla/geto/src/pkg/options"
+	bstrings "github.com/bresilla/geto/src/pkg/strings"
+	"github.com/bresilla/geto/src/pkg/ui"
 	"github.com/caarlos0/log"
 	"github.com/h2non/filetype"
 	"github.com/h2non/filetype/matchers"
@@ -51,9 +51,9 @@ func AIModelDir() string {
 	return filepath.Join(dir, "ai")
 }
 
-// aiDisabled reports whether BIN_NO_AI opts out of asset-selection learning.
+// aiDisabled reports whether GETO_NO_AI opts out of asset-selection learning.
 func aiDisabled() bool {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv("BIN_NO_AI"))) {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("GETO_NO_AI"))) {
 	case "1", "true", "yes", "on":
 		return true
 	}

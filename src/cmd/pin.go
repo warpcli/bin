@@ -3,7 +3,7 @@ package cmd
 import (
 	"strings"
 
-	"github.com/bresilla/bin/src/pkg/config"
+	"github.com/bresilla/geto/src/pkg/config"
 	"github.com/caarlos0/log"
 	"github.com/spf13/cobra"
 )

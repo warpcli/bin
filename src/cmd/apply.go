@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bresilla/bin/src/pkg/assets"
-	"github.com/bresilla/bin/src/pkg/config"
-	"github.com/bresilla/bin/src/pkg/providers"
+	"github.com/bresilla/geto/src/pkg/assets"
+	"github.com/bresilla/geto/src/pkg/config"
+	"github.com/bresilla/geto/src/pkg/providers"
 	"github.com/spf13/cobra"
 )
 

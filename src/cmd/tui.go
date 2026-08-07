@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bresilla/bin/src/pkg/assets"
-	"github.com/bresilla/bin/src/pkg/config"
-	"github.com/bresilla/bin/src/pkg/providers"
-	"github.com/bresilla/bin/src/pkg/ui"
+	"github.com/bresilla/geto/src/pkg/assets"
+	"github.com/bresilla/geto/src/pkg/config"
+	"github.com/bresilla/geto/src/pkg/providers"
+	"github.com/bresilla/geto/src/pkg/ui"
 	"github.com/caarlos0/log"
 	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/key"
@@ -343,7 +343,7 @@ func (m *tuiModel) rebuildRows() {
 		items = append(items, binItem{r})
 	}
 	m.rows = rows
-	m.list.Title = "bin · " + scope
+	m.list.Title = "geto · " + scope
 	idx := m.list.Index()
 	m.list.SetItems(items)
 	if idx >= 0 && idx < len(items) {

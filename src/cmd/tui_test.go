@@ -12,7 +12,7 @@ func TestTUIViewSmoke(t *testing.T) {
 	m := newTUIModel()
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	out := next.(tuiModel).View()
-	if !strings.Contains(out, "bin") {
+	if !strings.Contains(out, "geto") {
 		t.Fatalf("expected header in view, got:\n%s", out)
 	}
 }

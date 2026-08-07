@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/bresilla/bin/src/pkg/config"
+	"github.com/bresilla/geto/src/pkg/config"
 	"github.com/caarlos0/log"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -41,11 +41,11 @@ func resolveBins(args []string) (map[string]*config.Binary, error) {
 	for _, a := range args {
 		key, err := getBinPath(a)
 		if err != nil {
-			return nil, fmt.Errorf("%q is not managed by bin: %w", a, err)
+			return nil, fmt.Errorf("%q is not managed by geto: %w", a, err)
 		}
 		b := cfg.Bins[key]
 		if b == nil {
-			return nil, fmt.Errorf("%q is not managed by bin", a)
+			return nil, fmt.Errorf("%q is not managed by geto", a)
 		}
 		out[key] = b
 	}

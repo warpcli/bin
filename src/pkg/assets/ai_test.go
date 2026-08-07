@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bresilla/bin/src/pkg/ai"
+	"github.com/bresilla/geto/src/pkg/ai"
 )
 
 func TestMain(m *testing.M) {
@@ -180,31 +180,31 @@ func TestModelNeverOverridesTheDeterministicScore(t *testing.T) {
 
 func TestAIDisabledByEnv(t *testing.T) {
 	for _, v := range []string{"1", "true", "TRUE", "yes", "on", " on "} {
-		t.Setenv("BIN_NO_AI", v)
+		t.Setenv("GETO_NO_AI", v)
 		if !aiDisabled() {
-			t.Errorf("BIN_NO_AI=%q did not disable asset learning", v)
+			t.Errorf("GETO_NO_AI=%q did not disable asset learning", v)
 		}
 		if dir := AIModelDir(); dir != "" {
-			t.Errorf("BIN_NO_AI=%q still resolved a model dir %q", v, dir)
+			t.Errorf("GETO_NO_AI=%q still resolved a model dir %q", v, dir)
 		}
 	}
 	for _, v := range []string{"", "0", "false", "no", "off", "maybe"} {
-		t.Setenv("BIN_NO_AI", v)
+		t.Setenv("GETO_NO_AI", v)
 		if aiDisabled() {
-			t.Errorf("BIN_NO_AI=%q unexpectedly disabled asset learning", v)
+			t.Errorf("GETO_NO_AI=%q unexpectedly disabled asset learning", v)
 		}
 	}
 }
 
 func TestAIModelDirLivesInStateDir(t *testing.T) {
-	t.Setenv("BIN_NO_AI", "")
-	t.Setenv("BIN_STATE_HOME", t.TempDir())
+	t.Setenv("GETO_NO_AI", "")
+	t.Setenv("GETO_STATE_HOME", t.TempDir())
 
 	dir := AIModelDir()
 	if dir == "" {
-		t.Fatal("AIModelDir() is empty with BIN_STATE_HOME set")
+		t.Fatal("AIModelDir() is empty with GETO_STATE_HOME set")
 	}
-	if !strings.HasPrefix(dir, os.Getenv("BIN_STATE_HOME")) {
-		t.Fatalf("AIModelDir() = %q, want it under %q", dir, os.Getenv("BIN_STATE_HOME"))
+	if !strings.HasPrefix(dir, os.Getenv("GETO_STATE_HOME")) {
+		t.Fatalf("AIModelDir() = %q, want it under %q", dir, os.Getenv("GETO_STATE_HOME"))
 	}
 }

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/bresilla/bin/src/cmd"
+	"github.com/bresilla/geto/src/cmd"
 )
 
 // nolint: gochecknoglobals

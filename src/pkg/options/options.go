@@ -3,7 +3,7 @@ package options
 import (
 	"fmt"
 
-	"github.com/bresilla/bin/src/pkg/ui"
+	"github.com/bresilla/geto/src/pkg/ui"
 )
 
 type LiteralStringer string

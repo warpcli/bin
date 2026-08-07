@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/bresilla/bin/src/pkg/assets"
-	"github.com/bresilla/bin/src/pkg/options"
+	"github.com/bresilla/geto/src/pkg/assets"
+	"github.com/bresilla/geto/src/pkg/options"
 	"github.com/caarlos0/log"
 	"github.com/coreos/go-semver/semver"
 )

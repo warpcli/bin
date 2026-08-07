@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bresilla/bin/src/pkg/config"
-	"github.com/bresilla/bin/src/pkg/ui"
+	"github.com/bresilla/geto/src/pkg/config"
+	"github.com/bresilla/geto/src/pkg/ui"
 	"github.com/caarlos0/log"
 	"github.com/fatih/color"
 	"github.com/mattn/go-isatty"
@@ -123,7 +123,7 @@ func newRootCmd(version string, exit func(int)) *rootCmd {
 		exit: exit,
 	}
 	cmd := &cobra.Command{
-		Use:           "bin",
+		Use:           "geto",
 		Short:         "Effortless binary manager",
 		Version:       version,
 		SilenceUsage:  true,
@@ -152,9 +152,9 @@ func newRootCmd(version string, exit func(int)) *rootCmd {
 
 	cmd.PersistentFlags().BoolVar(&root.debug, "debug", false, "Enable debug mode")
 	cmd.PersistentFlags().StringSliceVarP(&root.tags, "tag", "t", nil, "Tag context: which tier to act on (default \"default\", \"all\" for every binary)")
-	cmd.PersistentFlags().StringVar(&root.configFile, "config-file", "", "Path to bin manifest (env BIN_CONFIG_FILE)")
-	cmd.PersistentFlags().StringVar(&root.stateFile, "state-file", "", "Path to mutable state file (env BIN_STATE_FILE)")
-	cmd.PersistentFlags().StringVar(&root.defaultPath, "default-path", "", "Default install directory (env BIN_DEFAULT_PATH)")
+	cmd.PersistentFlags().StringVar(&root.configFile, "config-file", "", "Path to geto manifest (env GETO_CONFIG_FILE)")
+	cmd.PersistentFlags().StringVar(&root.stateFile, "state-file", "", "Path to mutable state file (env GETO_STATE_FILE)")
+	cmd.PersistentFlags().StringVar(&root.defaultPath, "default-path", "", "Default install directory (env GETO_DEFAULT_PATH)")
 	cmd.AddCommand(
 		newInstallCmd().cmd,
 		newEnsureCmd().cmd,

@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bresilla/bin/src/pkg/config"
-	"github.com/bresilla/bin/src/pkg/providers"
-	"github.com/bresilla/bin/src/pkg/ui"
+	"github.com/bresilla/geto/src/pkg/config"
+	"github.com/bresilla/geto/src/pkg/providers"
+	"github.com/bresilla/geto/src/pkg/ui"
 	"github.com/caarlos0/log"
 	"github.com/spf13/cobra"
 )
@@ -93,7 +93,7 @@ func newEnsureCmd() *ensureCmd {
 				if packageName == "" {
 					packageName = filepath.Base(ep)
 				}
-				pResult, err := p.Fetch(&providers.FetchOpts{Version: binCfg.Version, PackagePath: binCfg.PackagePath, PackageName: packageName, SelectedAsset: binCfg.SelectedAsset, AssetFingerprint: binCfg.AssetFingerprint, PackageFingerprint: binCfg.PackageFingerprint, NonInteractive: envBool("BIN_NONINTERACTIVE"), CollectLibs: binCfg.Patch})
+				pResult, err := p.Fetch(&providers.FetchOpts{Version: binCfg.Version, PackagePath: binCfg.PackagePath, PackageName: packageName, SelectedAsset: binCfg.SelectedAsset, AssetFingerprint: binCfg.AssetFingerprint, PackageFingerprint: binCfg.PackageFingerprint, NonInteractive: envBool("GETO_NONINTERACTIVE"), CollectLibs: binCfg.Patch})
 				if err != nil {
 					return err
 				}

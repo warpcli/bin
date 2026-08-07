@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/bresilla/bin/src/pkg/assets"
+	"github.com/bresilla/geto/src/pkg/assets"
 )
 
 var ErrInvalidProvider = errors.New("invalid provider")

@@ -221,7 +221,7 @@ func prepareConfigDir(dir string, systemConfig bool) error {
 		info, err := os.Stat(dir)
 		if err != nil {
 			if os.IsNotExist(err) {
-				return fmt.Errorf("system config directory %s does not exist; create /etc/bin/list.json or set BIN_CONFIG_FILE", dir)
+				return fmt.Errorf("system config directory %s does not exist; create /etc/geto/list.json or set GETO_CONFIG_FILE", dir)
 			}
 			return err
 		}
@@ -241,7 +241,7 @@ func openManifest(path string, systemConfig bool) (*os.File, error) {
 		f, err := os.Open(path)
 		if err != nil {
 			if os.IsNotExist(err) {
-				return nil, fmt.Errorf("system config file %s does not exist; create it with Nix or set BIN_CONFIG_FILE", path)
+				return nil, fmt.Errorf("system config file %s does not exist; create it with Nix or set GETO_CONFIG_FILE", path)
 			}
 			return nil, err
 		}
@@ -905,7 +905,7 @@ func explicitDefaultPath() (string, bool) {
 	if p := pathOverrides.DefaultDir; p != "" {
 		return p, true
 	}
-	if p := os.Getenv("BIN_DEFAULT_PATH"); p != "" {
+	if p := os.Getenv("GETO_DEFAULT_PATH"); p != "" {
 		return p, true
 	}
 	return "", false
@@ -924,14 +924,14 @@ func defaultInstallPath() (string, error) {
 
 func hasConfigPathOverride() bool {
 	return pathOverrides.ConfigFile != "" ||
-		os.Getenv("BIN_CONFIG_FILE") != "" ||
-		os.Getenv("BIN_CONFIG_HOME") != ""
+		os.Getenv("GETO_CONFIG_FILE") != "" ||
+		os.Getenv("GETO_CONFIG_HOME") != ""
 }
 
 func hasStatePathOverride() bool {
 	return pathOverrides.StateFile != "" ||
-		os.Getenv("BIN_STATE_FILE") != "" ||
-		os.Getenv("BIN_STATE_HOME") != ""
+		os.Getenv("GETO_STATE_FILE") != "" ||
+		os.Getenv("GETO_STATE_HOME") != ""
 }
 
 func isSystemMode() bool {
@@ -939,25 +939,25 @@ func isSystemMode() bool {
 }
 
 func isSystemDefaultConfig(configPath string) bool {
-	return isSystemMode() && !hasConfigPathOverride() && configPath == "/etc/bin/list.json"
+	return isSystemMode() && !hasConfigPathOverride() && configPath == "/etc/geto/list.json"
 }
 
 // getConfigPath returns the path to the manifest file (list.json). Root defaults
-// to the system/declarative config in /etc/bin; normal users default to XDG
-// config (or ~/.config/bin), with ~/.bin/list.json kept as a legacy fallback
+// to the system/declarative config in /etc/geto; normal users default to XDG
+// config (or ~/.config/geto), with ~/.geto/list.json kept as a legacy fallback
 // only when no XDG config exists.
 func getConfigPath() (string, error) {
 	if p := pathOverrides.ConfigFile; p != "" {
 		return p, nil
 	}
-	if p := os.Getenv("BIN_CONFIG_FILE"); p != "" {
+	if p := os.Getenv("GETO_CONFIG_FILE"); p != "" {
 		return p, nil
 	}
-	if p := os.Getenv("BIN_CONFIG_HOME"); p != "" {
+	if p := os.Getenv("GETO_CONFIG_HOME"); p != "" {
 		return filepath.Join(p, "list.json"), nil
 	}
 	if isSystemMode() {
-		return "/etc/bin/list.json", nil
+		return "/etc/geto/list.json", nil
 	}
 
 	home, homeErr := os.UserHomeDir()
@@ -968,12 +968,12 @@ func getConfigPath() (string, error) {
 		}
 		configHome = filepath.Join(home, ".config")
 	}
-	configPath := filepath.Join(configHome, "bin", "list.json")
+	configPath := filepath.Join(configHome, "geto", "list.json")
 	if _, err := os.Stat(configPath); err == nil || homeErr != nil {
 		return configPath, nil
 	}
 
-	legacyPath := filepath.Join(home, ".bin", "list.json")
+	legacyPath := filepath.Join(home, ".geto", "list.json")
 	if _, err := os.Stat(legacyPath); err == nil {
 		return legacyPath, nil
 	}
@@ -987,18 +987,18 @@ func getStatePath(manifestPath string) (string, error) {
 	if p := pathOverrides.StateFile; p != "" {
 		return p, nil
 	}
-	if p := os.Getenv("BIN_STATE_FILE"); p != "" {
+	if p := os.Getenv("GETO_STATE_FILE"); p != "" {
 		return p, nil
 	}
-	if p := os.Getenv("BIN_STATE_HOME"); p != "" {
+	if p := os.Getenv("GETO_STATE_HOME"); p != "" {
 		return filepath.Join(p, "config.state.json"), nil
 	}
 	if isSystemMode() {
-		return "/var/lib/bin/config.state.json", nil
+		return "/var/lib/geto/config.state.json", nil
 	}
 
 	if d := os.Getenv("XDG_STATE_HOME"); d != "" {
-		return filepath.Join(d, "bin", "config.state.json"), nil
+		return filepath.Join(d, "geto", "config.state.json"), nil
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -1006,13 +1006,13 @@ func getStatePath(manifestPath string) (string, error) {
 	}
 	if runtime.GOOS == "windows" {
 		if ld := os.Getenv("LOCALAPPDATA"); ld != "" {
-			return filepath.Join(ld, "bin", "config.state.json"), nil
+			return filepath.Join(ld, "geto", "config.state.json"), nil
 		}
 		if ad := os.Getenv("APPDATA"); ad != "" {
-			return filepath.Join(ad, "bin", "config.state.json"), nil
+			return filepath.Join(ad, "geto", "config.state.json"), nil
 		}
 	}
-	return filepath.Join(home, ".local", "state", "bin", "config.state.json"), nil
+	return filepath.Join(home, ".local", "state", "geto", "config.state.json"), nil
 }
 
 func GetOSSpecificExtensions() []string {

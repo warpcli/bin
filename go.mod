@@ -1,4 +1,4 @@
-module github.com/bresilla/bin
+module github.com/bresilla/geto
 
 go 1.24.4
 

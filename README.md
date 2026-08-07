@@ -1,12 +1,12 @@
-# bin
+# geto
 
 <p align="center">
-  <img src="./misc/screenshot.png" alt="bin TUI screenshot" width="100%">
+  <img src="./misc/screenshot.png" alt="geto TUI screenshot" width="100%">
 </p>
 
 Effortless binary manager. Install, update, and organize standalone binaries pulled straight from release pages — no package manager, no build step.
 
-`bin` downloads release assets from GitHub, GitLab, Codeberg, HashiCorp releases, Docker images, or `go install`, picks the right artifact for your OS/arch, unpacks it if needed, and keeps track of what's installed so you can update everything in one command.
+`geto` downloads release assets from GitHub, GitLab, Codeberg, HashiCorp releases, Docker images, or `go install`, picks the right artifact for your OS/arch, unpacks it if needed, and keeps track of what's installed so you can update everything in one command.
 
 > A hard fork of [marcosnils/bin](https://github.com/marcosnils/bin) with a single tagged config, repo descriptions, and a full TUI.
 
@@ -15,33 +15,33 @@ Effortless binary manager. Install, update, and organize standalone binaries pul
 ## Install
 
 ```sh
-go install github.com/bresilla/bin/src@latest
+go install github.com/bresilla/geto/src@latest
 ```
 
 or build from source:
 
 ```sh
-git clone https://github.com/bresilla/bin
-cd bin
-make build      # produces ./bin
+git clone https://github.com/bresilla/geto
+cd geto
+make build      # produces ./geto
 ```
 
-On first run, `bin` picks a download directory from your `PATH` (e.g. `~/.local/bin`) and creates its config.
+On first run, `geto` picks a download directory from your `PATH` (e.g. `~/.local/bin`) and creates its config.
 
 ---
 
 ## Quick start
 
 ```sh
-bin install github.com/sharkdp/bat     # install (alias: add, i)
-bin                                     # launch the interactive TUI
-bin list                                # plain table of everything
-bin update                              # update the "default" tier
-bin update bat                          # update a single binary
-bin remove bat                          # uninstall (alias: rm, uninstall, delete)
+geto install github.com/sharkdp/bat     # install (alias: add, i)
+geto                                     # launch the interactive TUI
+geto list                                # plain table of everything
+geto update                              # update the "default" tier
+geto update bat                          # update a single binary
+geto remove bat                          # uninstall (alias: rm, uninstall, delete)
 ```
 
-Running `bin` with no arguments opens the **TUI** on a real terminal, and falls back to `list` when piped.
+Running `geto` with no arguments opens the **TUI** on a real terminal, and falls back to `list` when piped.
 
 ---
 
@@ -73,10 +73,10 @@ Useful flags on `update`:
 Every binary has one or more **tags**. Untagged binaries belong to `default`. A persistent `--tag/-t` flag sets the tag context for any command:
 
 ```sh
-bin install -t essential github.com/junegunn/fzf   # install tagged "essential"
-bin -t essential update                             # update only the "essential" tier
-bin -t all list                                     # everything, regardless of tag
-bin update                                          # == bin -t default update
+geto install -t essential github.com/junegunn/fzf   # install tagged "essential"
+geto -t essential update                             # update only the "essential" tier
+geto -t all list                                     # everything, regardless of tag
+geto update                                          # == geto -t default update
 ```
 
 - No `--tag` → acts on the **`default`** tier.
@@ -85,21 +85,21 @@ bin update                                          # == bin -t default update
 Change tags after the fact:
 
 ```sh
-bin tag ls                          # list tags and counts
-bin tag show bat                    # show a binary's tags
-bin tag add essential bat fzf       # add a tag
-bin tag rm  essential bat           # remove a tag (falls back to "default")
+geto tag ls                          # list tags and counts
+geto tag show bat                    # show a binary's tags
+geto tag add essential bat fzf       # add a tag
+geto tag rm  essential bat           # remove a tag (falls back to "default")
 ```
 
 ---
 
 ## Repository descriptions
 
-`bin` stores each repo's one-line description in the manifest so the TUI can show it offline. New installs fetch it automatically; backfill existing entries with:
+`geto` stores each repo's one-line description in the manifest so the TUI can show it offline. New installs fetch it automatically; backfill existing entries with:
 
 ```sh
-bin -t all describe          # fetch descriptions for everything missing one
-bin describe --force bat     # refetch even if already present
+geto -t all describe          # fetch descriptions for everything missing one
+geto describe --force bat     # refetch even if already present
 ```
 
 For private/rate-limited repos, export a token first (see [Authentication](#authentication)).
@@ -108,7 +108,7 @@ For private/rate-limited repos, export a token first (see [Authentication](#auth
 
 ## TUI
 
-Run `bin` (no args) to open the interactive UI: a full-width list with two-line entries showing name, version + update status, repo, architecture, libc (musl/glibc/static), size, tags, and the repo description.
+Run `geto` (no args) to open the interactive UI: a full-width list with two-line entries showing name, version + update status, repo, architecture, libc (musl/glibc/static), size, tags, and the repo description.
 
 | Key | Action |
 | --- | --- |
@@ -127,7 +127,7 @@ Run `bin` (no args) to open the interactive UI: a full-width list with two-line 
 
 ### Theming (`config`)
 
-On first run `bin` writes a `config` file. Colors are **terminal palette indexes (0–255) or hex** — so pywal-style tools recolor `bin` automatically, and the `232..255` grayscale ramp gives subtle row shading:
+On first run `geto` writes a `config` file. Colors are **terminal palette indexes (0–255) or hex** — so pywal-style tools recolor `geto` automatically, and the `232..255` grayscale ramp gives subtle row shading:
 
 ```ini
 # foreground colors
@@ -146,13 +146,13 @@ row_bg_selected = 237
 
 | File | Purpose |
 | --- | --- |
-| `$XDG_CONFIG_HOME/bin/list.json` | **Manifest** — portable: path, url, provider, tags, description |
-| `$XDG_STATE_HOME/bin/config.state.json` | **State** — per-machine: version, hash, package path, pinned, selected asset, cached description |
-| `$XDG_CONFIG_HOME/bin/config` | TUI colors |
+| `$XDG_CONFIG_HOME/geto/list.json` | **Manifest** — portable: path, url, provider, tags, description |
+| `$XDG_STATE_HOME/geto/config.state.json` | **State** — per-machine: version, hash, package path, pinned, selected asset, cached description |
+| `$XDG_CONFIG_HOME/geto/config` | TUI colors |
 
-The manifest and per-machine state are kept separate so the manifest is safe to share or check into dotfiles. Config resolution honors `$XDG_CONFIG_HOME`, falling back to `~/.config/bin` (or a legacy `~/.bin`).
-When run as root without explicit overrides, `bin` reads `/etc/bin/list.json`,
-writes `/var/lib/bin/config.state.json`, and installs into `/usr/local/bin`.
+The manifest and per-machine state are kept separate so the manifest is safe to share or check into dotfiles. Config resolution honors `$XDG_CONFIG_HOME`, falling back to `~/.config/geto` (or a legacy `~/.geto`).
+When run as root without explicit overrides, `geto` reads `/etc/geto/list.json`,
+writes `/var/lib/geto/config.state.json`, and installs into `/usr/local/bin`.
 
 ---
 
@@ -160,12 +160,12 @@ writes `/var/lib/bin/config.state.json`, and installs into `/usr/local/bin`.
 
 | Provider | Example |
 | --- | --- |
-| GitHub | `bin install github.com/cli/cli` |
-| GitLab | `bin install gitlab.com/gitlab-org/cli` |
-| Codeberg | `bin install codeberg.org/lukeflo/bibiman` |
-| HashiCorp | `bin install releases.hashicorp.com/terraform` |
-| Docker | `bin install docker://hashicorp/terraform` |
-| `go install` | `bin install goinstall://github.com/x/y` |
+| GitHub | `geto install github.com/cli/cli` |
+| GitLab | `geto install gitlab.com/gitlab-org/cli` |
+| Codeberg | `geto install codeberg.org/lukeflo/bibiman` |
+| HashiCorp | `geto install releases.hashicorp.com/terraform` |
+| Docker | `geto install docker://hashicorp/terraform` |
+| `go install` | `geto install goinstall://github.com/x/y` |
 
 Asset selection scores candidates by OS/arch and filters out non-installable files (`.sig`, `.sha256`, `.sbom`, `.deb`, …). Your pick is remembered, so updates don't re-prompt unless the release's file layout changes (use `update -r` to force a re-pick).
 
@@ -173,23 +173,23 @@ Asset selection scores candidates by OS/arch and filters out non-installable fil
 
 ## NixOS / Home Manager
 
-`bin` ships a flake package plus NixOS and Home Manager modules. In Nix you
+`geto` ships a flake package plus NixOS and Home Manager modules. In Nix you
 write a normal list of repositories; the module generates `list.json`, then runs
-`bin --tag all ensure`. `ensure` downloads missing binaries and fills the
+`geto --tag all ensure`. `ensure` downloads missing binaries and fills the
 mutable state file with versions, hashes, remembered asset choices, and cached
 repository descriptions.
 
 ```nix
 {
-  inputs.bin.url = "github:bresilla/bin";
+  inputs.geto.url = "github:bresilla/geto";
 
-  outputs = { nixpkgs, bin, ... }: {
+  outputs = { nixpkgs, geto, ... }: {
     nixosConfigurations.host = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        bin.nixosModules.default
+        geto.nixosModules.default
         {
-          programs.bin = {
+          programs.geto = {
             enable = true;
 
             entries = [
@@ -209,9 +209,9 @@ For Home Manager:
 
 ```nix
 {
-  imports = [ inputs.bin.homeManagerModules.default ];
+  imports = [ inputs.geto.homeManagerModules.default ];
 
-  programs.bin = {
+  programs.geto = {
     enable = true;
     entries = [
       "github.com/rust-lang/mdBook"
@@ -221,7 +221,7 @@ For Home Manager:
 }
 ```
 
-The generated manifest is just regular `bin` config:
+The generated manifest is just regular `geto` config:
 
 ```json
 {
@@ -237,20 +237,20 @@ The generated manifest is just regular `bin` config:
 }
 ```
 
-For the default root/system paths, create `/etc/bin/list.json` and run:
+For the default root/system paths, create `/etc/geto/list.json` and run:
 
 ```sh
-sudo bin --tag all ensure
+sudo geto --tag all ensure
 ```
 
-You can also point `bin` at an explicit manifest/state/install directory:
+You can also point `geto` at an explicit manifest/state/install directory:
 
 ```sh
-BIN_CONFIG_FILE=/tmp/bin/list.json \
-BIN_STATE_FILE=/tmp/bin/state.json \
-BIN_DEFAULT_PATH=/tmp/bin/bin \
-BIN_NONINTERACTIVE=1 \
-bin --tag all ensure
+GETO_CONFIG_FILE=/tmp/geto/list.json \
+GETO_STATE_FILE=/tmp/geto/state.json \
+GETO_DEFAULT_PATH=/tmp/geto/bin \
+GETO_NONINTERACTIVE=1 \
+geto --tag all ensure
 ```
 
 ---
@@ -268,7 +268,7 @@ Set as needed in your environment:
 ## Development
 
 ```sh
-make build      # build ./bin (version-stamped)
+make build      # build ./geto (version-stamped)
 make install    # install to $PREFIX/bin (default ~/.local/bin)
 make run ARGS='list -t all'
 make test       # go test ./...
@@ -279,6 +279,6 @@ make help       # list all targets
 
 ## License & credits
 
-MIT — see [LICENSE](./LICENSE). `bin` is a hard fork of
+MIT — see [LICENSE](./LICENSE). `geto` is a hard fork of
 [marcosnils/bin](https://github.com/marcosnils/bin); see
 [ACKNOWLEDGMENTS.md](./ACKNOWLEDGMENTS.md).

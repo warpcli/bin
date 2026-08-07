@@ -4,7 +4,7 @@
 }:
 
 buildGoModule rec {
-  pname = "bin";
+  pname = "geto";
   version = "0.3.0";
 
   src = lib.cleanSource ../.;
@@ -21,8 +21,8 @@ buildGoModule rec {
 
   meta = {
     description = "Effortless binary manager";
-    homepage = "https://github.com/bresilla/bin";
+    homepage = "https://github.com/bresilla/geto";
     license = lib.licenses.mit;
-    mainProgram = "bin";
+    mainProgram = "geto";
   };
 }

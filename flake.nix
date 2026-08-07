@@ -1,5 +1,5 @@
 {
-  description = "bin binary manager";
+  description = "geto binary manager";
 
   inputs = {
     # Pinned to a rev that still accepts the `kernel` arg in
@@ -73,15 +73,15 @@
           libxi
           libxrandr
         ];
-        binPackage = pkgs.callPackage ./nix/package.nix { };
+        getoPackage = pkgs.callPackage ./nix/package.nix { };
       in
       {
-        packages.default = binPackage;
-        packages.bin = binPackage;
+        packages.default = getoPackage;
+        packages.geto = getoPackage;
 
         apps.default = flake-utils.lib.mkApp {
-          drv = binPackage;
-          exePath = "/bin/bin";
+          drv = getoPackage;
+          exePath = "/bin/geto";
         };
 
         devShells.default = pkgs.mkShell {
@@ -115,7 +115,7 @@
     )
     // {
       overlays.default = final: prev: {
-        bin = final.callPackage ./nix/package.nix { };
+        geto = final.callPackage ./nix/package.nix { };
       };
 
       nixosModules.default = import ./nix/nixos-module.nix { inherit self; };

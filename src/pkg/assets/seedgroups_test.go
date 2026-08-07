@@ -40,8 +40,8 @@ var seedPlatforms = []struct {
 }
 
 func TestGenerateSeedGroups(t *testing.T) {
-	if os.Getenv("BIN_GENERATE_SEED") == "" {
-		t.Skip("set BIN_GENERATE_SEED=1 to regenerate " + groupsPath)
+	if os.Getenv("GETO_GENERATE_SEED") == "" {
+		t.Skip("set GETO_GENERATE_SEED=1 to regenerate " + groupsPath)
 	}
 
 	corpus := loadSeedCorpus(t)
