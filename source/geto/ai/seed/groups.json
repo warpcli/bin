@@ -1,0 +1,458 @@
+[
+ {
+  "repo": "asciinema",
+  "platform": "linux/amd64",
+  "chosen": "asciinema-x86_64-unknown-linux-musl",
+  "rejected": [
+   "asciinema-x86_64-unknown-linux-gnu"
+  ]
+ },
+ {
+  "repo": "atuin",
+  "platform": "linux/amd64",
+  "chosen": "atuin-x86_64-unknown-linux-musl.tar.gz",
+  "rejected": [
+   "atuin-server-x86_64-unknown-linux-gnu.tar.gz",
+   "atuin-server-x86_64-unknown-linux-musl.tar.gz",
+   "atuin-x86_64-unknown-linux-gnu.tar.gz"
+  ]
+ },
+ {
+  "repo": "atuin",
+  "platform": "linux/arm64",
+  "chosen": "atuin-aarch64-unknown-linux-musl.tar.gz",
+  "rejected": [
+   "atuin-aarch64-unknown-linux-gnu.tar.gz",
+   "atuin-server-aarch64-unknown-linux-gnu.tar.gz",
+   "atuin-server-aarch64-unknown-linux-musl.tar.gz"
+  ]
+ },
+ {
+  "repo": "atuin",
+  "platform": "windows/amd64",
+  "chosen": "atuin-x86_64-pc-windows-msvc.zip",
+  "rejected": [
+   "atuin-server-x86_64-pc-windows-msvc.zip"
+  ]
+ },
+ {
+  "repo": "bun",
+  "platform": "windows/amd64",
+  "chosen": "bun-windows-x64.zip",
+  "rejected": [
+   "bun-windows-x64-baseline-profile.zip",
+   "bun-windows-x64-baseline.zip",
+   "bun-windows-x64-profile.zip"
+  ]
+ },
+ {
+  "repo": "cloudflared",
+  "platform": "linux/amd64",
+  "chosen": "cloudflared-linux-amd64",
+  "rejected": [
+   "cloudflared-fips-linux-amd64"
+  ]
+ },
+ {
+  "repo": "codex",
+  "platform": "linux/amd64",
+  "chosen": "codex-x86_64-unknown-linux-musl.tar.gz",
+  "rejected": [
+   "codex-app-server-package-x86_64-unknown-linux-musl.tar.gz",
+   "codex-app-server-package-x86_64-unknown-linux-musl.tar.zst",
+   "codex-app-server-x86_64-unknown-linux-musl.tar.gz",
+   "codex-app-server-x86_64-unknown-linux-musl.zst",
+   "codex-code-mode-host-x86_64-unknown-linux-musl.tar.gz",
+   "codex-code-mode-host-x86_64-unknown-linux-musl.zst",
+   "codex-npm-linux-x64-0.147.0-alpha.4.tgz",
+   "codex-package-x86_64-unknown-linux-musl.tar.gz",
+   "codex-package-x86_64-unknown-linux-musl.tar.zst",
+   "codex-responses-api-proxy-x86_64-unknown-linux-musl.tar.gz",
+   "codex-responses-api-proxy-x86_64-unknown-linux-musl.zst",
+   "codex-symbols-x86_64-unknown-linux-musl-app-server.tar.gz",
+   "codex-symbols-x86_64-unknown-linux-musl.tar.gz",
+   "codex-x86_64-unknown-linux-musl.zst"
+  ]
+ },
+ {
+  "repo": "codex",
+  "platform": "linux/arm64",
+  "chosen": "codex-aarch64-unknown-linux-musl.tar.gz",
+  "rejected": [
+   "codex-aarch64-unknown-linux-musl.zst",
+   "codex-app-server-aarch64-unknown-linux-musl.tar.gz",
+   "codex-app-server-aarch64-unknown-linux-musl.zst",
+   "codex-app-server-package-aarch64-unknown-linux-musl.tar.gz",
+   "codex-app-server-package-aarch64-unknown-linux-musl.tar.zst",
+   "codex-code-mode-host-aarch64-unknown-linux-musl.tar.gz",
+   "codex-code-mode-host-aarch64-unknown-linux-musl.zst",
+   "codex-npm-linux-arm64-0.147.0-alpha.4.tgz",
+   "codex-package-aarch64-unknown-linux-musl.tar.gz",
+   "codex-package-aarch64-unknown-linux-musl.tar.zst",
+   "codex-responses-api-proxy-aarch64-unknown-linux-musl.tar.gz",
+   "codex-responses-api-proxy-aarch64-unknown-linux-musl.zst",
+   "codex-symbols-aarch64-unknown-linux-musl-app-server.tar.gz",
+   "codex-symbols-aarch64-unknown-linux-musl.tar.gz"
+  ]
+ },
+ {
+  "repo": "codex",
+  "platform": "windows/amd64",
+  "chosen": "codex-x86_64-pc-windows-msvc.exe.tar.gz",
+  "rejected": [
+   "codex-app-server-package-x86_64-pc-windows-msvc.tar.gz",
+   "codex-app-server-package-x86_64-pc-windows-msvc.tar.zst",
+   "codex-app-server-x86_64-pc-windows-msvc.exe",
+   "codex-app-server-x86_64-pc-windows-msvc.exe.tar.gz",
+   "codex-app-server-x86_64-pc-windows-msvc.exe.zip",
+   "codex-app-server-x86_64-pc-windows-msvc.exe.zst",
+   "codex-code-mode-host-x86_64-pc-windows-msvc.exe",
+   "codex-code-mode-host-x86_64-pc-windows-msvc.exe.tar.gz",
+   "codex-code-mode-host-x86_64-pc-windows-msvc.exe.zip",
+   "codex-code-mode-host-x86_64-pc-windows-msvc.exe.zst",
+   "codex-command-runner-x86_64-pc-windows-msvc.exe",
+   "codex-command-runner-x86_64-pc-windows-msvc.exe.tar.gz",
+   "codex-command-runner-x86_64-pc-windows-msvc.exe.zip",
+   "codex-command-runner-x86_64-pc-windows-msvc.exe.zst",
+   "codex-package-x86_64-pc-windows-msvc.tar.gz",
+   "codex-package-x86_64-pc-windows-msvc.tar.zst",
+   "codex-responses-api-proxy-x86_64-pc-windows-msvc.exe",
+   "codex-responses-api-proxy-x86_64-pc-windows-msvc.exe.tar.gz",
+   "codex-responses-api-proxy-x86_64-pc-windows-msvc.exe.zip",
+   "codex-responses-api-proxy-x86_64-pc-windows-msvc.exe.zst",
+   "codex-symbols-x86_64-pc-windows-msvc.tar.gz",
+   "codex-windows-sandbox-setup-x86_64-pc-windows-msvc.exe",
+   "codex-windows-sandbox-setup-x86_64-pc-windows-msvc.exe.tar.gz",
+   "codex-windows-sandbox-setup-x86_64-pc-windows-msvc.exe.zip",
+   "codex-windows-sandbox-setup-x86_64-pc-windows-msvc.exe.zst",
+   "codex-x86_64-pc-windows-msvc.exe",
+   "codex-x86_64-pc-windows-msvc.exe.zip",
+   "codex-x86_64-pc-windows-msvc.exe.zst"
+  ]
+ },
+ {
+  "repo": "delta",
+  "platform": "linux/amd64",
+  "chosen": "delta-0.19.2-x86_64-unknown-linux-musl.tar.gz",
+  "rejected": [
+   "delta-0.19.2-x86_64-unknown-linux-gnu.tar.gz"
+  ]
+ },
+ {
+  "repo": "eza",
+  "platform": "linux/amd64",
+  "chosen": "eza_x86_64-unknown-linux-musl.tar.gz",
+  "rejected": [
+   "eza_x86_64-unknown-linux-gnu.tar.gz",
+   "eza_x86_64-unknown-linux-gnu.zip",
+   "eza_x86_64-unknown-linux-musl.zip"
+  ]
+ },
+ {
+  "repo": "eza",
+  "platform": "linux/arm64",
+  "chosen": "eza_aarch64-unknown-linux-gnu.tar.gz",
+  "rejected": [
+   "eza_aarch64-unknown-linux-gnu.zip",
+   "eza_aarch64-unknown-linux-gnu_no_libgit.tar.gz",
+   "eza_aarch64-unknown-linux-gnu_no_libgit.zip"
+  ]
+ },
+ {
+  "repo": "eza",
+  "platform": "windows/amd64",
+  "chosen": "eza.exe_x86_64-pc-windows-gnu.tar.gz",
+  "rejected": [
+   "eza.exe_x86_64-pc-windows-gnu.zip"
+  ]
+ },
+ {
+  "repo": "git-cliff",
+  "platform": "linux/amd64",
+  "chosen": "git-cliff-2.13.1-x86_64-unknown-linux-musl.tar.gz",
+  "rejected": [
+   "git-cliff-2.13.1-x86_64-unknown-linux-gnu.tar.gz"
+  ]
+ },
+ {
+  "repo": "git-cliff",
+  "platform": "linux/arm64",
+  "chosen": "git-cliff-2.13.1-aarch64-unknown-linux-musl.tar.gz",
+  "rejected": [
+   "git-cliff-2.13.1-aarch64-unknown-linux-gnu.tar.gz"
+  ]
+ },
+ {
+  "repo": "git-town",
+  "platform": "linux/amd64",
+  "chosen": "git-town_linux_intel_64.tar.gz",
+  "rejected": [
+   "git-town_linux_intel_64.pkg.tar.zst"
+  ]
+ },
+ {
+  "repo": "git-town",
+  "platform": "linux/arm64",
+  "chosen": "git-town_linux_arm_64.tar.gz",
+  "rejected": [
+   "git-town_linux_arm_64.pkg.tar.zst"
+  ]
+ },
+ {
+  "repo": "goose",
+  "platform": "linux/amd64",
+  "chosen": "goose-x86_64-unknown-linux-musl.tar.gz",
+  "rejected": [
+   "goose-x86_64-unknown-linux-gnu-vulkan.tar.bz2",
+   "goose-x86_64-unknown-linux-gnu-vulkan.tar.gz",
+   "goose-x86_64-unknown-linux-gnu.tar.bz2",
+   "goose-x86_64-unknown-linux-gnu.tar.gz",
+   "goose-x86_64-unknown-linux-musl.tar.bz2"
+  ]
+ },
+ {
+  "repo": "goose",
+  "platform": "linux/arm64",
+  "chosen": "goose-aarch64-unknown-linux-musl.tar.gz",
+  "rejected": [
+   "goose-aarch64-unknown-linux-gnu-vulkan.tar.bz2",
+   "goose-aarch64-unknown-linux-gnu-vulkan.tar.gz",
+   "goose-aarch64-unknown-linux-gnu.tar.bz2",
+   "goose-aarch64-unknown-linux-gnu.tar.gz",
+   "goose-aarch64-unknown-linux-musl.tar.bz2"
+  ]
+ },
+ {
+  "repo": "goose",
+  "platform": "windows/amd64",
+  "chosen": "goose-x86_64-pc-windows-msvc.zip",
+  "rejected": [
+   "goose-x86_64-pc-windows-msvc-cuda.zip"
+  ]
+ },
+ {
+  "repo": "hugo",
+  "platform": "linux/amd64",
+  "chosen": "hugo_0.164.0_linux-amd64.tar.gz",
+  "rejected": [
+   "hugo_extended_0.164.0_linux-amd64.tar.gz",
+   "hugo_extended_withdeploy_0.164.0_linux-amd64.tar.gz",
+   "hugo_withdeploy_0.164.0_linux-amd64.tar.gz"
+  ]
+ },
+ {
+  "repo": "hugo",
+  "platform": "linux/arm64",
+  "chosen": "hugo_0.164.0_linux-arm64.tar.gz",
+  "rejected": [
+   "hugo_extended_0.164.0_linux-arm64.tar.gz",
+   "hugo_extended_withdeploy_0.164.0_linux-arm64.tar.gz",
+   "hugo_withdeploy_0.164.0_linux-arm64.tar.gz"
+  ]
+ },
+ {
+  "repo": "hugo",
+  "platform": "windows/amd64",
+  "chosen": "hugo_0.164.0_windows-amd64.zip",
+  "rejected": [
+   "hugo_extended_0.164.0_windows-amd64.zip",
+   "hugo_extended_withdeploy_0.164.0_windows-amd64.zip",
+   "hugo_withdeploy_0.164.0_windows-amd64.zip"
+  ]
+ },
+ {
+  "repo": "joycast",
+  "platform": "linux/arm64",
+  "chosen": "joycast-linux-arm64-musl.tar.gz",
+  "rejected": [
+   "joycast-linux-arm64.tar.gz"
+  ]
+ },
+ {
+  "repo": "lockbook",
+  "platform": "linux/amd64",
+  "chosen": "lockbook-linux",
+  "rejected": [
+   "lockbook-cli-linux"
+  ]
+ },
+ {
+  "repo": "lockbook",
+  "platform": "linux/arm64",
+  "chosen": "lockbook-linux",
+  "rejected": [
+   "lockbook-cli-linux"
+  ]
+ },
+ {
+  "repo": "micromamba-releases",
+  "platform": "linux/arm64",
+  "chosen": "micromamba-linux-aarch64",
+  "rejected": [
+   "micromamba-linux-aarch64.tar.bz2"
+  ]
+ },
+ {
+  "repo": "names",
+  "platform": "linux/amd64",
+  "chosen": "names-x86_64-unknown-linux-musl.tar.gz",
+  "rejected": [
+   "names-x86_64-unknown-linux-gnu.tar.gz"
+  ]
+ },
+ {
+  "repo": "netbird",
+  "platform": "linux/amd64",
+  "chosen": "netbird_0.76.1_linux_amd64.tar.gz",
+  "rejected": [
+   "netbird-idp-migrate_0.76.1_linux_amd64.tar.gz",
+   "netbird-ui-linux_0.76.1_linux_amd64.tar.gz"
+  ]
+ },
+ {
+  "repo": "netbird",
+  "platform": "linux/arm64",
+  "chosen": "netbird_0.76.1_linux_arm64.tar.gz",
+  "rejected": [
+   "netbird-idp-migrate_0.76.1_linux_arm64.tar.gz"
+  ]
+ },
+ {
+  "repo": "netbird",
+  "platform": "windows/amd64",
+  "rejected": [
+   "netbird-ui-windows_0.76.1_windows_amd64.tar.gz",
+   "netbird_installer_0.76.1_windows_amd64.exe"
+  ],
+  "note": "no single winner; tied leaders: netbird_0.76.1_windows_amd64.tar.gz netbird_0.76.1_windows_amd64_signed.tar.gz"
+ },
+ {
+  "repo": "ollama",
+  "platform": "linux/amd64",
+  "chosen": "ollama-linux-amd64.tar.zst",
+  "rejected": [
+   "ollama-linux-amd64-mlx.tar.zst",
+   "ollama-linux-amd64-rocm.tar.zst"
+  ]
+ },
+ {
+  "repo": "ollama",
+  "platform": "linux/arm64",
+  "chosen": "ollama-linux-arm64.tar.zst",
+  "rejected": [
+   "ollama-linux-arm64-jetpack5.tar.zst",
+   "ollama-linux-arm64-jetpack6.tar.zst"
+  ]
+ },
+ {
+  "repo": "ollama",
+  "platform": "windows/amd64",
+  "chosen": "ollama-windows-amd64.zip",
+  "rejected": [
+   "ollama-windows-amd64-mlx.zip",
+   "ollama-windows-amd64-rocm.zip"
+  ]
+ },
+ {
+  "repo": "opencode",
+  "platform": "linux/amd64",
+  "chosen": "opencode-linux-x64-musl.tar.gz",
+  "rejected": [
+   "opencode-linux-x64-baseline-musl.tar.gz",
+   "opencode-linux-x64-baseline.tar.gz",
+   "opencode-linux-x64.tar.gz"
+  ]
+ },
+ {
+  "repo": "opencode",
+  "platform": "linux/arm64",
+  "chosen": "opencode-linux-arm64-musl.tar.gz",
+  "rejected": [
+   "opencode-linux-arm64.tar.gz"
+  ]
+ },
+ {
+  "repo": "opencode",
+  "platform": "windows/amd64",
+  "chosen": "opencode-windows-x64.zip",
+  "rejected": [
+   "opencode-windows-x64-baseline.zip"
+  ]
+ },
+ {
+  "repo": "presenterm",
+  "platform": "linux/amd64",
+  "chosen": "presenterm-0.16.1-x86_64-unknown-linux-musl.tar.gz",
+  "rejected": [
+   "presenterm-0.16.1-x86_64-unknown-linux-gnu.tar.gz"
+  ]
+ },
+ {
+  "repo": "presenterm",
+  "platform": "linux/arm64",
+  "chosen": "presenterm-0.16.1-aarch64-unknown-linux-musl.tar.gz",
+  "rejected": [
+   "presenterm-0.16.1-aarch64-unknown-linux-gnu.tar.gz"
+  ]
+ },
+ {
+  "repo": "rargs",
+  "platform": "linux/amd64",
+  "chosen": "rargs-v0.3.0-x86_64-unknown-linux-musl.tar.gz",
+  "rejected": [
+   "rargs-v0.3.0-x86_64-unknown-linux-gnu.tar.gz"
+  ]
+ },
+ {
+  "repo": "spotifyd",
+  "platform": "linux/amd64",
+  "chosen": "spotifyd-linux-x86_64-default.tar.gz",
+  "rejected": [
+   "spotifyd-linux-x86_64-full.tar.gz",
+   "spotifyd-linux-x86_64-slim.tar.gz"
+  ]
+ },
+ {
+  "repo": "spotifyd",
+  "platform": "linux/arm64",
+  "chosen": "spotifyd-linux-aarch64-default.tar.gz",
+  "rejected": [
+   "spotifyd-linux-aarch64-full.tar.gz",
+   "spotifyd-linux-aarch64-slim.tar.gz"
+  ]
+ },
+ {
+  "repo": "tab-rs",
+  "platform": "linux/amd64",
+  "chosen": "tab-x86_64-unknown-linux-musl.tar.gz",
+  "rejected": [
+   "tab-x86_64-unknown-linux-gnu.tar.gz"
+  ]
+ },
+ {
+  "repo": "tab-rs",
+  "platform": "windows/amd64",
+  "chosen": "tab-x86_64-unknown-linux-musl.tar.gz",
+  "rejected": [
+   "tab-x86_64-unknown-linux-gnu.tar.gz"
+  ]
+ },
+ {
+  "repo": "zenoh",
+  "platform": "linux/amd64",
+  "chosen": "zenoh-1.9.0-x86_64-unknown-linux-musl-standalone.zip",
+  "rejected": [
+   "zenoh-1.9.0-x86_64-unknown-linux-gnu-debian.zip",
+   "zenoh-1.9.0-x86_64-unknown-linux-gnu-standalone.zip"
+  ]
+ },
+ {
+  "repo": "zenoh",
+  "platform": "linux/arm64",
+  "chosen": "zenoh-1.9.0-aarch64-unknown-linux-musl-standalone.zip",
+  "rejected": [
+   "zenoh-1.9.0-aarch64-unknown-linux-gnu-debian.zip",
+   "zenoh-1.9.0-aarch64-unknown-linux-gnu-standalone.zip"
+  ]
+ }
+]
