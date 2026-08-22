@@ -1,0 +1,24 @@
+{
+  "name": "geto",
+  "description": "Effortless binary manager",
+  "license": "MIT",
+  "authors": ["Trim Bresilla"],
+  "targetType": "executable",
+  "targetName": "geto",
+  "sourcePaths": ["source"],
+  "importPaths": ["source"],
+  "stringImportPaths": ["source/geto/ai/seed"],
+  "dependencies": {
+    "mochafizz": {
+      "repository": "git+https://github.com/bresilla/mochafizz",
+      "version": "3a850efb602d7c15ceec17722025d0e7539531aa"
+    },
+    "requests": "~>2.2.1",
+    "squiz-box": "~>0.3.0"
+  },
+  "buildTypes": {
+    "release": {
+      "buildOptions": ["releaseMode", "optimize", "inline"]
+    }
+  }
+}

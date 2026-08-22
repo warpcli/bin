@@ -1,24 +1,21 @@
-# Binaries for programs and plugins
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
+# build output
+/geto
+/geto-test-*
+/build/
+*.o
+*.a
+*.lst
 
-# Test binary, built with `go test -c`
-*.test
+# dub
+/.dub/
+/dub.selections.json
 
-# Output of the go coverage tool, specifically when used with LiteIDE
-*.out
+# nix / direnv
+/result
+/result-*
+.direnv/
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
-#
-
-geto
-
-/.vscode/
-/__debug_bin
-
-dist
-CLAUDE.md
+# editors
+.vscode/
+.idea/
+*.swp
