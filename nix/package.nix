@@ -50,7 +50,7 @@ buildDubPackage rec {
 
   meta = {
     description = "Effortless binary manager";
-    homepage = "https://github.com/bresilla/geto";
+    homepage = "https://github.com/termworks/geto";
     license = lib.licenses.mit;
     mainProgram = "geto";
     platforms = lib.platforms.linux;

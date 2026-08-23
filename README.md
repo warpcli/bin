@@ -14,11 +14,11 @@ Effortless binary manager. Install, update, and organize standalone binaries pul
 
 ## Install
 
-Grab a binary from the [releases page](https://github.com/bresilla/geto/releases),
+Grab a binary from the [releases page](https://github.com/termworks/geto/releases),
 or build from source:
 
 ```sh
-git clone https://github.com/bresilla/geto
+git clone https://github.com/termworks/geto
 cd geto
 make build      # produces ./geto
 ```
@@ -208,7 +208,7 @@ repository descriptions.
 
 ```nix
 {
-  inputs.geto.url = "github:bresilla/geto";
+  inputs.geto.url = "github:termworks/geto";
 
   outputs = { nixpkgs, geto, ... }: {
     nixosConfigurations.host = nixpkgs.lib.nixosSystem {

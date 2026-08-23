@@ -14,7 +14,7 @@ descriptions, a Bubble Tea TUI, and a reworked CLI. It would not exist without
 the upstream project.
 
 - Upstream: https://github.com/marcosnils/bin
-- This fork: https://github.com/bresilla/geto
+- This fork: https://github.com/termworks/geto
 
 The original code is MIT licensed; this fork keeps the MIT license and preserves
 the original copyright alongside the fork's — see [LICENSE](./LICENSE).
