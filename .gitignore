@@ -6,8 +6,8 @@
 *.a
 *.lst
 
-# dub (dub.selections.json is tracked: this is an application, so exact
-# dependency versions belong in the repo)
+# dub. dub.json is the only manifest kept; dub rewrites the selections file on
+# every build and nix pins its dependencies by hash instead.
 /.dub/
 
 # nix / direnv
@@ -19,3 +19,9 @@
 .vscode/
 .idea/
 *.swp
+
+# dub writes this on every build; the manifest is the source of truth
+/dub.selections.json
+
+# the checkout-local install target used by .env.lua
+/target/

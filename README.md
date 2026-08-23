@@ -23,6 +23,10 @@ cd geto
 make build      # produces ./geto
 ```
 
+`make` here is [oslo](https://github.com/bresilla/oslo)'s recipe runner reading
+`.make.lua`; outside an oslo shell it is `oslo make`. Plain
+`dub build --build=release` works just as well.
+
 Building needs [LDC](https://github.com/ldc-developers/ldc) and
 [dub](https://dub.pm), plus the OpenSSL, xz, bzip2, zstd and zlib development
 headers. The flake's dev shell (`nix develop`) provides all of them.
@@ -310,23 +314,25 @@ The same three paths are also available as `--config-file`, `--state-file` and
 
 `geto` is written in [D](https://dlang.org) and built with dub.
 
+Recipes live in `.make.lua`. At an [oslo](https://github.com/bresilla/oslo)
+prompt in this directory `make` is enough; everywhere else it is `oslo make`.
+
 ```sh
-make build      # build ./geto (optimized)
-make install    # install to $PREFIX/bin (default ~/.local/bin)
-make run ARGS='list -t all'
-make test       # dub test
-make verify     # fmt-check + lock-check + test
-make lock       # regenerate dub-lock.json after changing a dependency
+make            # the recipes, with what each of them does
+make build      # the release binary
+make run list   # run it; bare words pass through, flags go in --args
+make test       # the suite
+make verify     # fmt-check + test + build
 make static     # fully static build (needs musl static libs — see below)
-make release TYPE=minor   # cut a release via git-rel
-make help       # list all targets
+make install    # into $PREFIX/bin (default ~/.local/bin)
+make release --type minor
 ```
 
-`make build` uses the `release` build type: `-release -O3 -enable-inlining`,
-plus `--function-sections`/`--data-sections` with `--gc-sections` and `-s` to
-drop unreferenced code and symbols. `make build NATIVE=1` adds `-mcpu=native`,
-which tunes for the building machine and is therefore not portable — releases
-never use it.
+`build` uses the `release` build type: `-release -O3 -enable-inlining`, plus
+`--function-sections`/`--data-sections` with `--gc-sections` and `-s` to drop
+unreferenced code and symbols. `NATIVE=1 make build` adds `-mcpu=native`, which
+tunes for the building machine and is therefore not portable — releases never
+use it.
 
 ### Layout
 
@@ -342,9 +348,13 @@ never use it.
 | `source/geto/cmd/` | CLI commands and the interactive TUI |
 
 The TUI is built on [mochafizz](https://github.com/bresilla/mochafizz), pinned
-by commit in `dub.json`. `dub-lock.json` feeds the Nix build, so re-pinning a
-dependency means running `make lock` — otherwise `nix build` tries to fetch over
-git, which the sandbox forbids. `make verify` checks the two agree.
+by commit in `dub.json` — which is the only manifest here. The version lives
+there too, and `source/app.d` reads it at compile time, so `geto --version`
+cannot drift from it.
+
+`nix build` fetches the dub dependencies through a fixed-output derivation, so
+moving any dependency means updating `outputHash` in `nix/package.nix` — build
+once, and Nix prints the hash it wanted.
 
 ### Static builds
 

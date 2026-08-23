@@ -1,13 +1,18 @@
 module app;
 
 import core.stdc.stdlib : exit;
-import std.string : strip;
+import std.json : parseJSON;
 
 import geto.cmd.root : run;
 
-/// Single source of truth for the release version; the Makefile and the
-/// release workflow read the same file.
-enum buildVersion = import("VERSION").strip;
+/// The version lives in dub.json and nowhere else. Read at compile time, so
+/// there is no second copy to fall out of step with the manifest.
+private string manifestVersion()
+{
+    return parseJSON(import("dub.json"))["version"].str;
+}
+
+enum buildVersion = manifestVersion();
 
 void main(string[] args)
 {
