@@ -16,6 +16,23 @@
     "requests": "~>2.2.1",
     "squiz-box": "~>0.3.0"
   },
+  "configurations": [
+    {
+      "name": "application",
+      "targetType": "executable",
+      "mainSourceFile": "source/app.d"
+    },
+    {
+      "name": "static",
+      "targetType": "executable",
+      "comment": "Fully static build. Needs musl static archives for openssl, lzma, bzip2 and zstd — see `make static` and the Alpine release job.",
+      "mainSourceFile": "source/app.d",
+      "subConfigurations": {
+        "requests": "staticssl"
+      },
+      "dflags": ["-static"]
+    }
+  ],
   "buildTypes": {
     "release": {
       "buildOptions": ["releaseMode", "optimize", "inline"]

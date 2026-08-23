@@ -1,33 +1,17 @@
 SHELL := /bin/bash
 
-PROJECT_NAME := $(shell if [ -f PROJECT ]; then sed -n '/^[[:space:]]*[^#\[[:space:]]/p' PROJECT | head -1 | tr -d '[:space:]'; else basename "$$(sed -n 's/^module[[:space:]]*//p' go.mod)"; fi)
-PROJECT_VERSION := $(shell if [ -f PROJECT ]; then sed -n '/^[[:space:]]*[^#\[[:space:]]/p' PROJECT | sed -n '2p' | tr -d '[:space:]'; else sed -n 's/^[[:space:]]*version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' src/main.go | head -1; fi)
+PROJECT_NAME := $(shell if [ -f PROJECT ]; then sed -n '/^[[:space:]]*[^#\[[:space:]]/p' PROJECT | head -1 | tr -d '[:space:]'; else sed -n 's/^[[:space:]]*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' dub.json | head -1; fi)
+PROJECT_VERSION := $(shell if [ -f PROJECT ]; then sed -n '/^[[:space:]]*[^#\[[:space:]]/p' PROJECT | sed -n '2p' | tr -d '[:space:]'; else sed -n 's/^[[:space:]]*enum buildVersion[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' source/app.d | head -1; fi)
 ifeq ($(PROJECT_NAME),)
-    $(error Error: could not determine project name from PROJECT or go.mod)
+    $(error Error: could not determine project name from PROJECT or dub.json)
 endif
 
 TOP_DIR := $(CURDIR)
-GO := go
+DUB := dub
+DC ?= ldc2
 PREFIX ?= $(HOME)/.local
 ARGS ?=
-
-# bin is pure Go, so cgo buys it nothing and costs portability. With cgo enabled
-# the net package links the system resolver, and the binary picks up a hard
-# dependency on the build host's libc — on Nix that is an absolute /nix/store
-# path, so the result only runs on the machine that built it. Disabling cgo
-# produces a fully static binary with no libc dependency at all (neither glibc
-# nor musl), which is also what .github/workflows/release.yml builds.
-# Override with `make build CGO_ENABLED=1` if you ever genuinely need cgo.
-CGO_ENABLED ?= 0
-export CGO_ENABLED
-
-GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null)
-BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
-LDFLAGS := -s -w \
-	-X main.version=$(PROJECT_VERSION) \
-	-X main.commit=$(GIT_COMMIT) \
-	-X main.date=$(BUILD_DATE) \
-	-X main.builtBy=make
+BUILD_TYPE ?= release
 
 HAS_REL := $(shell command -v git-rel 2>/dev/null)
 HAS_CLIFF := $(shell command -v git-cliff 2>/dev/null)
@@ -36,21 +20,20 @@ $(info ------------------------------------------)
 $(info Project: $(PROJECT_NAME) v$(PROJECT_VERSION))
 $(info ------------------------------------------)
 
-.PHONY: build b compile c run r install uninstall test t test-all cover check static vet fmt fmt-check tidy clean changelog verify release help h
+.PHONY: build b compile c run r install uninstall test t test-all cover check static \
+	fmt fmt-check clean changelog verify release help h
 
 build:
-	@$(GO) build -trimpath -ldflags "$(LDFLAGS)" -o $(PROJECT_NAME) ./src
+	@$(DUB) build --compiler=$(DC) --build=$(BUILD_TYPE)
 
 b: build
 
-compile:
-	@$(GO) clean
-	@$(MAKE) build
+compile: clean build
 
 c: compile
 
 run:
-	@$(GO) run ./src $(ARGS)
+	@$(DUB) run --compiler=$(DC) --build=debug -- $(ARGS)
 
 r: run
 
@@ -64,23 +47,30 @@ uninstall:
 	@echo "removed -> $(PREFIX)/bin/$(PROJECT_NAME)"
 
 test:
-	@$(GO) test ./...
+	@$(DUB) test --compiler=$(DC)
 
 t: test
 
-test-all:
-	@$(GO) test -race -count=1 ./...
+test-all: test
 
 cover:
-	@$(GO) test -coverprofile=coverage.out ./...
-	@$(GO) tool cover -func=coverage.out
+	@$(DUB) test --compiler=$(DC) --build=unittest-cov
+	@echo "coverage written to *.lst"
 
-check: vet
+check: test
 
-# static verifies the built binary has no dynamic library dependencies. A Go
-# binary that accidentally links libc still runs fine on the build host, so the
-# regression is invisible without an explicit check.
-static: build
+# A static build needs musl static archives for openssl, lzma, bzip2 and zstd.
+# The release workflow does this inside an Alpine container; locally you need
+# the same packages installed (openssl-libs-static xz-static bzip2-static
+# zstd-static zlib-static).
+static:
+	@$(DUB) build --compiler=$(DC) --build=$(BUILD_TYPE) --config=static
+	@$(MAKE) --no-print-directory verify-static
+
+# verify-static fails if the built binary still needs a dynamic loader or any
+# shared library. Without the check a partially static build looks fine on the
+# machine that produced it and breaks everywhere else.
+verify-static:
 	@if ! command -v readelf >/dev/null 2>&1; then \
 		echo "readelf not found; skipping static check"; exit 0; \
 	fi
@@ -96,23 +86,26 @@ static: build
 	fi
 	@echo "$(PROJECT_NAME): statically linked, no libc dependency"
 
-vet:
-	@$(GO) vet ./...
-
 fmt:
-	@gofmt -w .
-	@$(GO) mod tidy
+	@if command -v dfmt >/dev/null 2>&1; then \
+		find source -name '*.d' -print0 | xargs -0 dfmt --inplace; \
+	else \
+		echo "dfmt not found; skipping"; \
+	fi
 
 fmt-check:
-	@out="$$(gofmt -l .)"; \
-	if [ -n "$$out" ]; then echo "gofmt needed on:"; echo "$$out"; exit 1; fi
-
-tidy:
-	@$(GO) mod tidy
+	@if ! command -v dfmt >/dev/null 2>&1; then \
+		echo "dfmt not found; skipping"; exit 0; \
+	fi
+	@out=""; \
+	for f in $$(find source -name '*.d'); do \
+		if ! dfmt "$$f" | diff -q - "$$f" >/dev/null; then out="$$out $$f"; fi; \
+	done; \
+	if [ -n "$$out" ]; then echo "dfmt needed on:$$out"; exit 1; fi
 
 clean:
-	@$(GO) clean
-	@rm -f $(PROJECT_NAME) coverage.out
+	@$(DUB) clean >/dev/null 2>&1 || true
+	@rm -f $(PROJECT_NAME) $(PROJECT_NAME)-test-* *.lst
 
 changelog:
 	@if [ -z "$(HAS_CLIFF)" ]; then \
@@ -121,7 +114,7 @@ changelog:
 	fi
 	@git cliff -o CHANGELOG.md
 
-verify: fmt-check vet test static
+verify: fmt-check test
 
 release:
 	@if [ -z "$(HAS_REL)" ]; then \
@@ -139,23 +132,21 @@ help:
 	@echo "Usage: make [target]"
 	@echo
 	@echo "Available targets:"
-	@echo "  build        Build the binary (./$(PROJECT_NAME))"
-	@echo "  compile      Clean and rebuild"
-	@echo "  run          Run locally (pass args with ARGS=...)"
-	@echo "  install      Install to \$$PREFIX/bin (default ~/.local/bin)"
-	@echo "  uninstall    Remove the installed binary"
-	@echo "  test         Run all tests"
-	@echo "  test-all     Run tests with the race detector"
-	@echo "  cover        Run tests and print coverage"
-	@echo "  vet          Run go vet"
-	@echo "  static       Verify the binary has no libc dependency"
-	@echo "  fmt          Format the tree and tidy modules"
-	@echo "  fmt-check    Fail if anything is unformatted"
-	@echo "  tidy         Tidy go.mod/go.sum"
-	@echo "  clean        Remove build artifacts"
-	@echo "  changelog    Regenerate CHANGELOG.md (git-cliff)"
-	@echo "  verify       Run the full local gate (fmt-check + vet + test + static)"
-	@echo "  release      Release a new version (git-rel)"
+	@echo "  build         Build the binary (./$(PROJECT_NAME))"
+	@echo "  compile       Clean and rebuild"
+	@echo "  run           Run locally (pass args with ARGS=...)"
+	@echo "  install       Install to \$$PREFIX/bin (default ~/.local/bin)"
+	@echo "  uninstall     Remove the installed binary"
+	@echo "  test          Run the unit tests"
+	@echo "  cover         Run tests with coverage"
+	@echo "  static        Build fully static (needs musl static libs) and verify"
+	@echo "  verify-static Check an existing binary has no libc dependency"
+	@echo "  fmt           Format the tree with dfmt"
+	@echo "  fmt-check     Fail if anything is unformatted"
+	@echo "  clean         Remove build artifacts"
+	@echo "  changelog     Regenerate CHANGELOG.md (git-cliff)"
+	@echo "  verify        Run the local gate (fmt-check + test)"
+	@echo "  release       Release a new version (git-rel)"
 	@echo
 	@echo "Examples:"
 	@echo "  make run ARGS='list -t all'"
