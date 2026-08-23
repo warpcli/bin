@@ -176,7 +176,14 @@ files (`.sig`, `.sha256`, `.sbom`, `.deb`, …), source archives and install
 scripts. Assets built for another operating system are dropped, and a release
 with no build for your platform fails with a clear message instead of offering
 a Windows or macOS artefact — pass `--all` to pick from everything anyway.
-Where a release ships twins, musl wins over glibc/gcc and static over dynamic.
+Where a release ships twins, musl wins over glibc/gcc, static over dynamic,
+and the plain build over accelerator (`-rocm`, `-mlx`) or debug variants.
+Distribution packages and source archives never compete with the binary.
+
+When several assets still score identically, geto asks — and remembers the
+answer. A small naive-Bayes model over asset-name tokens, plus a nine-feature
+network, learns from those answers and resolves clear-cut ties on its own; see
+`geto ai`. Set `GETO_NO_AI=1` to turn it off.
 
 Your pick is remembered, so updates don't re-prompt unless the release's file
 layout changes (use `update -r` to force a re-pick).

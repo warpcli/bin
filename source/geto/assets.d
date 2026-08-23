@@ -316,6 +316,13 @@ private immutable string[][] archAliasGroups = [
     ["amd64", "x86_64", "x86-64", "x64", "intel_64", "intel64"],
     ["arm64", "aarch64", "arm_64", "arm-64", "armv8"],
     ["386", "i386", "i686", "x86"],
+    // Bare "arm" is deliberately absent: it matches inside "arm64" and would
+    // mark 64-bit builds as foreign on an arm64 host.
+    ["armv6", "armv7", "armv7l", "armhf", "armel"],
+    ["ppc64le", "ppc64", "powerpc64", "powerpc", "ppc"], ["s390x"],
+    ["riscv64", "riscv"],
+    ["mips64le", "mips64el", "mips64", "mipsle", "mipsel", "mips"],
+    ["loong64", "loongarch64"],
 ];
 
 /// Whether an asset could be something geto can install. Keeps supported
@@ -495,21 +502,13 @@ bool allForeignOs(Asset[] assets)
 /// with no native match keep their full set so a manual choice stays possible.
 Asset[] preferNativeArch(Asset[] assets)
 {
-    bool hasNative = false;
-    foreach (asset; assets)
-        if (hasNativeArch(asset.name))
-        {
-            hasNative = true;
-            break;
-        }
-    if (!hasNative)
-        return assets;
-
     Asset[] result;
     foreach (asset; assets)
         if (hasNativeArch(asset.name) || !hasForeignArch(asset.name))
             result ~= asset;
-    return result;
+    // Everything names a foreign architecture, so keep the list intact and let
+    // the user decide rather than offering nothing.
+    return result.length > 0 ? result : assets;
 }
 
 /// Collapses libc-flavor twins, keeping musl when both are offered.
@@ -574,16 +573,19 @@ Asset[] preferMusl(Asset[] assets)
         foreach (asset; group)
         {
             const lower = asset.name.toLower;
-            if (hasMusl && (lower.canFind("gnu") || lower.canFind("glibc")
-                    || lower.containsToken("gcc")))
-                continue; // drop the glibc/gnu twin in favor of musl
+            // Everything in this group is the same build bar its libc, so
+            // once a musl variant exists the others go — including the one
+            // that names no libc at all, which is the dynamic glibc build.
+            if (hasMusl && !lower.containsToken("musl"))
+                continue;
             result ~= asset;
         }
     }
     return result;
 }
 
-/// Drops source archives and install scripts when a real artifact is on offer.
+/// Drops source archives, install scripts and distribution packages when a
+/// plain artifact is on offer.
 /// `hck` ships `hck-linux-amd64` beside `hck-linux-amd64-src.tar.gz`, and
 /// `flawz` ships a `flawz-installer.sh`; only the built binary is something
 /// geto can install and run.
@@ -592,7 +594,10 @@ Asset[] preferBuilt(Asset[] assets)
     static bool isSource(string name)
     {
         auto tokens = assetTokens(name);
-        foreach (token; ["src", "source", "sources", "installer"])
+        foreach (token; [
+            "src", "source", "sources", "installer", "package", "pkg",
+            "debian", "ubuntu", "fedora", "centos", "rhel"
+        ])
             if (tokens.canFind(token))
                 return true;
         return false;
@@ -637,6 +642,57 @@ Asset[] preferStatic(Asset[] assets)
     return result;
 }
 
+/// Tokens marking a build that is not the one most people want: accelerator
+/// flavours, debug artefacts and alternate front-ends.
+private immutable string[] variantTokens = [
+    "mlx", "rocm", "cuda", "vulkan", "jetpack", "jetpack5", "jetpack6", "fips",
+    "baseline", "profile", "debug", "dbg", "symbols", "syms", "gui", "desktop",
+];
+
+/// Drops accelerator and debug variants when a plain build is also offered.
+/// ollama ships `-mlx` and `-rocm` beside the ordinary archive, and opencode
+/// ships `-baseline` twins; neither is the default choice.
+Asset[] preferPlainBuild(Asset[] assets)
+{
+    static bool isVariant(string name)
+    {
+        auto tokens = assetTokens(name);
+        foreach (token; variantTokens)
+            if (tokens.canFind(token))
+                return true;
+        return false;
+    }
+
+    Asset[] result;
+    foreach (asset; assets)
+        if (!isVariant(asset.name))
+            result ~= asset;
+    return result.length > 0 ? result : assets;
+}
+
+/// Picks one compression among otherwise identical tar siblings. goose ships
+/// the same build as .tar.bz2 and .tar.gz; there is nothing to choose between
+/// them, so take the most widely supported.
+private Asset[] bestCompression(Asset[] tars)
+{
+    if (tars.length <= 1)
+        return tars;
+    static immutable order = [
+        ".tar.gz", ".tgz", ".tar.xz", ".txz", ".tar.zst", ".tzst", ".tar.bz2",
+        ".tbz2", ".tbz", ".tar"
+    ];
+    foreach (suffix; order)
+    {
+        Asset[] matching;
+        foreach (asset; tars)
+            if (asset.name.toLower.endsWith(suffix))
+                matching ~= asset;
+        if (matching.length > 0)
+            return matching;
+    }
+    return tars;
+}
+
 private immutable string[] tarSuffixes = [
     ".tar.gz", ".tgz", ".tar.xz", ".txz", ".tar.bz2", ".tbz2", ".tbz",
     ".tar.zst", ".tzst", ".tar",
@@ -657,6 +713,11 @@ private string archiveStem(string name, out bool isTar, out bool isZip)
         isZip = true;
         return lower[0 .. $ - ".zip".length];
     }
+    // A bare .zst or .gz holds the same payload as the .tar.gz beside it, so
+    // strip it too and let them share a group.
+    foreach (suffix; [".gz", ".xz", ".bz2", ".zst"])
+        if (lower.endsWith(suffix))
+            return lower[0 .. $ - suffix.length];
     return lower;
 }
 
@@ -707,24 +768,28 @@ Asset[] preferArchiveType(Asset[] assets)
     foreach (key; order)
     {
         auto group = groups[key];
+        Asset[] archives;
         if (group.tar.length > 0 && group.zip.length > 0)
-            result ~= preferTar ? group.tar : group.zip;
+            archives = preferTar ? bestCompression(group.tar) : group.zip;
         else
-        {
-            result ~= group.tar;
-            result ~= group.zip;
-        }
-        result ~= group.other;
+            archives = bestCompression(group.tar) ~ group.zip;
+
+        result ~= archives;
+        // A bare blob beside an archive of the same name is the same payload,
+        // so only offer it when no archive exists.
+        if (archives.length == 0)
+            result ~= group.other;
     }
     return result;
 }
 
 /// Narrows a release to the assets that suit this machine. Order matters:
-/// drop non-artifacts first, then container format, libc, architecture,
-/// operating system, and finally static twins.
+/// drop non-artifacts and variant builds first, then container format, libc,
+/// architecture, operating system, and finally static twins.
 Asset[] narrowToPlatform(Asset[] assets)
 {
     auto result = preferBuilt(assets);
+    result = preferPlainBuild(result);
     result = preferArchiveType(result);
     result = preferMusl(result);
     result = preferNativeArch(result);
@@ -1555,7 +1620,9 @@ unittest
     setResolver(linuxAmd64());
 
     const chosen = "codex-app-server-x86_64-unknown-linux-musl.tar.gz";
-    auto marks = fingerprint(filterUsableAssets(codexAssets("0.140.0")));
+    // The fingerprint has to come off the same narrowed set selectReleaseAsset
+    // records, or a pure version bump looks like a layout change.
+    auto marks = fingerprint(narrowToPlatform(filterUsableAssets(codexAssets("0.140.0"))));
 
     // A pure version bump keeps the layout, so the remembered choice is reused
     // and the user is never prompted.
@@ -1569,7 +1636,7 @@ unittest
     // forces the re-prompt.
     auto extended = codexAssets("0.141.0") ~ new Asset(
             "codex-extra-x86_64-unknown-linux-musl.tar.gz");
-    assert(fingerprint(filterUsableAssets(extended)) != marks);
+    assert(fingerprint(narrowToPlatform(filterUsableAssets(extended))) != marks);
 }
 
 unittest
@@ -1711,4 +1778,71 @@ unittest
         "flawz-installer.sh", "flawz-installer.ps1", "source.tar.gz"
     ], chosen, options);
     assert(chosen.length == 0 && options.length == 0);
+}
+
+unittest
+{
+    scope (exit)
+        resetResolver();
+    setResolver(linuxAmd64());
+
+    static struct Case
+    {
+        string repo;
+        string[] assets;
+        string expected;
+        string why;
+    }
+
+    const cases = [
+        // Accelerator flavours are not the default build.
+        Case("ollama", [
+            "ollama-linux-amd64.tar.zst", "ollama-linux-amd64-mlx.tar.zst",
+            "ollama-linux-amd64-rocm.tar.zst"
+        ], "ollama-linux-amd64.tar.zst", "variant builds lose to the plain one"),
+        // musl wins even when the sibling names no libc at all.
+        Case("opencode", [
+            "opencode-linux-x64-musl.tar.gz", "opencode-linux-x64.tar.gz",
+            "opencode-linux-x64-baseline-musl.tar.gz",
+            "opencode-linux-x64-baseline.tar.gz"
+        ], "opencode-linux-x64-musl.tar.gz", "musl beats an unmarked sibling"),
+        // Architectures beyond x86/arm are recognised as foreign.
+        Case("micromamba", [
+            "micromamba-linux-64.tar.bz2", "micromamba-linux-aarch64.tar.bz2",
+            "micromamba-linux-ppc64le.tar.bz2"
+        ], "micromamba-linux-64.tar.bz2", "ppc64le is a foreign architecture"),
+        // A bare compressed blob is the same payload as the tar beside it.
+        Case("codex", [
+            "codex-x86_64-unknown-linux-musl.tar.gz",
+            "codex-x86_64-unknown-linux-musl.zst"
+        ], "codex-x86_64-unknown-linux-musl.tar.gz", "tar wins over a bare blob"),
+        // Identical builds in two compressions need no question.
+        Case("goose", [
+            "goose-x86_64-unknown-linux-musl.tar.bz2",
+            "goose-x86_64-unknown-linux-musl.tar.gz"
+        ], "goose-x86_64-unknown-linux-musl.tar.gz", "gz is the common choice"),
+        // Distribution packages are not standalone binaries.
+        Case("git-town", [
+            "git-town_linux_intel_64.pkg.tar.zst",
+            "git-town_linux_intel_64.tar.gz"
+        ], "git-town_linux_intel_64.tar.gz", "an Arch package is not a binary"),
+    ];
+
+    foreach (testCase; cases)
+    {
+        string chosen;
+        string[] options;
+        preview(testCase.repo, testCase.assets, chosen, options);
+        assert(chosen == testCase.expected, testCase.repo ~ " (" ~ testCase.why ~ "): chose " ~ (chosen.length
+                ? chosen : "<prompt>") ~ ", want " ~ testCase.expected);
+    }
+
+    // Genuinely different builds still deserve a question.
+    string chosen;
+    string[] options;
+    preview("spotifyd", [
+        "spotifyd-linux-x86_64-default.tar.gz",
+        "spotifyd-linux-x86_64-full.tar.gz", "spotifyd-linux-x86_64-slim.tar.gz"
+    ], chosen, options);
+    assert(chosen.length == 0 && options.length == 3);
 }
