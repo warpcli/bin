@@ -231,8 +231,8 @@ final class Engine
 
         writeFileAtomic(buildPath(dir, classifierFile), classifier.toJson());
         auto stateNode = JSONValue(state);
-        writeFileAtomic(buildPath(dir, stateFile),
-            toJSON(stateNode, false, JSONOptions.doNotEscapeSlashes));
+        writeFileAtomic(buildPath(dir, stateFile), toJSON(stateNode, false,
+                JSONOptions.doNotEscapeSlashes));
     }
 
     /// Restores model state, throwing when it is absent or unusable.
@@ -247,8 +247,8 @@ final class Engine
 
         const version_ = ("version" in root.objectNoRef) ? root["version"].integer : 0;
         if (version_ != modelVersion)
-            throw new Exception("model version " ~ version_.to!string
-                    ~ ", want " ~ modelVersion.to!string);
+            throw new Exception(
+                    "model version " ~ version_.to!string ~ ", want " ~ modelVersion.to!string);
 
         auto weights1 = readWeights(root, "weights1");
         auto weights2 = readWeights(root, "weights2");
@@ -286,8 +286,8 @@ final class Engine
             // version is the Go build's; only the shape has to line up.
             auto weights1 = readWeights(root, "weights1");
             auto weights2 = readWeights(root, "weights2");
-            if (weights1.length != layer1.weights.length
-                || weights2.length != layer2.weights.length)
+            if (weights1.length != layer1.weights.length || weights2.length != layer2
+                    .weights.length)
                 return;
             if (!allFinite(weights1) || !allFinite(weights2))
                 return;
@@ -311,8 +311,7 @@ final class Engine
         if (found is null || found.type != JSONType.array)
             return result;
         foreach (item; found.arrayNoRef)
-            result ~= item.type == JSONType.integer
-                ? cast(double) item.integer : item.floating;
+            result ~= item.type == JSONType.integer ? cast(double) item.integer : item.floating;
         return result;
     }
 
@@ -370,11 +369,10 @@ bool resetModel(string dir)
 // ---------------------------------------------------------------------------
 
 private immutable string[] variantTokens = [
-    "debug", "dbg", "symbols", "syms", "profile", "baseline",
-    "src", "source", "sources", "vendor", "sbom", "package", "npm",
-    "installer", "setup", "gui", "desktop", "app", "ui",
-    "android", "ios", "cuda", "rocm", "vulkan", "mlx", "jetpack",
-    "jetpack5", "jetpack6", "fips",
+    "debug", "dbg", "symbols", "syms", "profile", "baseline", "src", "source",
+    "sources", "vendor", "sbom", "package", "npm", "installer", "setup",
+    "gui", "desktop", "app", "ui", "android", "ios", "cuda", "rocm", "vulkan",
+    "mlx", "jetpack", "jetpack5", "jetpack6", "fips",
 ];
 
 private immutable bool[string] platformTokens;
@@ -383,18 +381,17 @@ shared static this()
 {
     bool[string] tokens;
     foreach (name; [
-            "linux", "windows", "win", "win32", "win64", "freebsd", "netbsd",
-            "openbsd", "dragonfly", "solaris", "illumos", "android", "amd64",
-            "x86", "x64", "i386", "i686", "i586", "arm", "arm64", "aarch64",
-            "armv6", "armv7", "armv8", "armhf", "armel", "ppc64", "ppc64le",
-            "s390x", "mips", "mipsle", "mips64", "mips64le", "riscv64",
-            "loong64", "universal", "universal2", "intel", "intel64",
-            "powerpc", "gnu", "gnueabi", "gnueabihf", "musl", "musleabi",
-            "musleabihf", "msvc", "mingw", "mingw32", "mingw64", "unknown",
-            "pc", "none", "static", "tar", "gz", "tgz", "zip", "bz2", "tbz",
-            "tbz2", "xz", "txz", "zst", "tzst", "7z", "exe", "appimage",
-            "deb", "rpm", "dmg", "pkg", "msi", "bin"
-        ])
+        "linux", "windows", "win", "win32", "win64", "freebsd", "netbsd",
+        "openbsd", "dragonfly", "solaris", "illumos", "android", "amd64", "x86",
+        "x64", "i386", "i686", "i586", "arm", "arm64", "aarch64", "armv6",
+        "armv7", "armv8", "armhf", "armel", "ppc64", "ppc64le", "s390x", "mips",
+        "mipsle", "mips64", "mips64le", "riscv64", "loong64", "universal",
+        "universal2", "intel", "intel64", "powerpc", "gnu", "gnueabi", "gnueabihf",
+        "musl", "musleabi", "musleabihf", "msvc", "mingw", "mingw32", "mingw64",
+        "unknown", "pc", "none", "static", "tar", "gz", "tgz", "zip", "bz2",
+        "tbz", "tbz2", "xz", "txz", "zst", "tzst", "7z", "exe", "appimage",
+        "deb", "rpm", "dmg", "pkg", "msi", "bin"
+    ])
         tokens[name] = true;
     platformTokens = cast(immutable) tokens;
 }
@@ -502,9 +499,9 @@ private void archiveKind(string lower, out bool tarball, out bool zip, out bool 
     else if (lower.endsWith(".zip"))
         zip = true;
     else if (hasAnySuffix(lower, [
-            ".tar.bz2", ".tbz2", ".tbz", ".bz2", ".tar.xz", ".txz", ".xz",
-            ".tar.zst", ".tzst", ".zst", ".7z"
-        ]))
+        ".tar.bz2", ".tbz2", ".tbz", ".bz2", ".tar.xz", ".txz", ".xz",
+        ".tar.zst", ".tzst", ".zst", ".7z"
+    ]))
         exotic = true;
 }
 
@@ -529,8 +526,9 @@ private void writeFileAtomic(string path, string data)
 
 unittest
 {
-    assert(tokenize("ripgrep-14.1.0-x86_64-unknown-linux-musl.tar.gz")
-            == ["ripgrep", "x86", "unknown", "linux", "musl", "tar", "gz"]);
+    assert(tokenize("ripgrep-14.1.0-x86_64-unknown-linux-musl.tar.gz") == [
+        "ripgrep", "x86", "unknown", "linux", "musl", "tar", "gz"
+    ]);
     assert(splitTokens("Foo_Bar-1.2") == ["foo", "bar", "1", "2"]);
     assert(isNumericToken("v12") && !isNumericToken("v12a"));
     assert(isHashToken("deadbeef") && !isHashToken("dead"));
@@ -545,6 +543,6 @@ unittest
     assert(engine.seeded);
     assert(engine.trained);
     // The seed corpus prefers a musl Linux build over a Windows one.
-    assert(engine.score("tool-x86_64-unknown-linux-musl.tar.gz", "tool")
-            > engine.score("tool-x86_64-pc-windows-msvc.zip", "tool"));
+    assert(engine.score("tool-x86_64-unknown-linux-musl.tar.gz",
+            "tool") > engine.score("tool-x86_64-pc-windows-msvc.zip", "tool"));
 }

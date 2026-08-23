@@ -4,8 +4,7 @@ import std.array : appender, join, replicate, split;
 
 import mochafizz.ansi.width : stringWidth;
 import mochafizz.ansi.wrap : strip, truncate, truncateLeft;
-import mochafizz.style : background, bold, foreground, newStyle, padding,
-    render, withBorder;
+import mochafizz.style : background, bold, foreground, newStyle, padding, render, withBorder;
 import mochafizz.uv.border : roundedBorder;
 
 import geto.ui.styles : colorMuted, colorPrimary, colorText, mutedStyle;
@@ -13,8 +12,8 @@ import geto.ui.styles : colorMuted, colorPrimary, colorText, mutedStyle;
 /// Renders a modal dialog box.
 string dialog(string title, string body_, string footer)
 {
-    const bar = newStyle().bold().foreground(colorText).background(colorPrimary)
-        .padding(0, 1).render(title);
+    const bar = newStyle().bold().foreground(colorText)
+        .background(colorPrimary).padding(0, 1).render(title);
 
     auto output = appender!string;
     output ~= bar ~ "\n\n";

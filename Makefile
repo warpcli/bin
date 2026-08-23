@@ -88,22 +88,18 @@ verify-static:
 	fi
 	@echo "$(PROJECT_NAME): statically linked, no libc dependency"
 
+# dfmt is the dlang-community formatter, fetched through dub. The `dfmt` in
+# some distro repos is an unrelated docstring tool, so it is run via dub.
 fmt:
-	@if command -v dfmt >/dev/null 2>&1; then \
-		find source -name '*.d' -print0 | xargs -0 dfmt --inplace; \
-	else \
-		echo "dfmt not found; skipping"; \
-	fi
+	@for f in $$(find source -name '*.d'); do $(DUB) run -q dfmt -- --inplace "$$f"; done
 
 fmt-check:
-	@if ! command -v dfmt >/dev/null 2>&1; then \
-		echo "dfmt not found; skipping"; exit 0; \
-	fi
 	@out=""; \
 	for f in $$(find source -name '*.d'); do \
-		if ! dfmt "$$f" | diff -q - "$$f" >/dev/null; then out="$$out $$f"; fi; \
+		if ! $(DUB) run -q dfmt -- "$$f" | diff -q - "$$f" >/dev/null; then out="$$out $$f"; fi; \
 	done; \
-	if [ -n "$$out" ]; then echo "dfmt needed on:$$out"; exit 1; fi
+	if [ -n "$$out" ]; then echo "dfmt needed on:$$out"; exit 1; fi; \
+	echo "formatting ok"
 
 clean:
 	@$(DUB) clean >/dev/null 2>&1 || true

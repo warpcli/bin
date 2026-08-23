@@ -101,9 +101,9 @@ string[] systemLibDirs()
     bool[string] seen;
     dirs ~= ldSoConfDirs("/etc/ld.so.conf", seen);
     dirs ~= [
-        "/lib", "/usr/lib", "/lib64", "/usr/lib64",
-        "/lib/x86_64-linux-gnu", "/usr/lib/x86_64-linux-gnu",
-        "/lib/aarch64-linux-gnu", "/usr/lib/aarch64-linux-gnu",
+        "/lib", "/usr/lib", "/lib64", "/usr/lib64", "/lib/x86_64-linux-gnu",
+        "/usr/lib/x86_64-linux-gnu", "/lib/aarch64-linux-gnu",
+        "/usr/lib/aarch64-linux-gnu",
     ];
     return dirs;
 }
@@ -168,9 +168,11 @@ private string[] expandGlob(string pattern)
 
     string[] matches;
     try
+    {
         foreach (DirEntry entry; dirEntries(dir, SpanMode.shallow))
             if (entry.name.baseName.globMatch(mask))
                 matches ~= entry.name;
+    }
     catch (Exception)
         return null;
     return matches;
@@ -183,6 +185,7 @@ void reportMissingLibs(string path)
     if (missing.length == 0)
         return;
     warnf("%s needs shared libraries not found on your system: %s",
-        path.baseName, missing.join(", "));
-    warn("the release may bundle these (re-extract the full archive), or install them with your system package manager");
+            path.baseName, missing.join(", "));
+    warn(
+            "the release may bundle these (re-extract the full archive), or install them with your system package manager");
 }

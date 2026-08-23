@@ -12,8 +12,7 @@ import mochafizz.tea.msg : KeyPressMsg, Msg;
 import mochafizz.tea.program : Model, ModelUpdate, newProgram;
 import mochafizz.tea.view : View, newView;
 import mochafizz.term.raw : isTerminal;
-import mochafizz.bubbles.textinput : TextInput, newTextInput, setValue, update,
-    value, view;
+import mochafizz.bubbles.textinput : TextInput, newTextInput, setValue, update, value, view;
 import mochafizz.uv.key : keyToString = toString, matchString;
 
 import geto.ui.styles : accentStyle, colorMuted, colorPrimary, colorText,
@@ -137,8 +136,8 @@ private final class SelectModel : Model
         foreach (i; top .. end)
         {
             if (i == cursor)
-                output ~= accentStyle.render("▸ ")
-                    ~ newStyle().foreground(colorText).bold().render(items[i]) ~ "\n";
+                output ~= accentStyle.render("▸ ") ~ newStyle()
+                    .foreground(colorText).bold().render(items[i]) ~ "\n";
             else
                 output ~= "  " ~ mutedStyle.render(items[i]) ~ "\n";
         }
@@ -257,13 +256,14 @@ private final class PickModel : Model
         foreach (i, item; items)
         {
             if (i == cursor && !typing)
-                output ~= accentStyle.render("▸ ")
-                    ~ newStyle().foreground(colorText).bold().render(item) ~ "\n";
+                output ~= accentStyle.render("▸ ") ~ newStyle()
+                    .foreground(colorText).bold().render(item) ~ "\n";
             else
                 output ~= "  " ~ mutedStyle.render(item) ~ "\n";
         }
         output ~= newStyle().foreground(colorMuted).render("› ") ~ input.view() ~ "\n";
-        output ~= mutedStyle.render("↑/↓ pick · type a custom value · enter confirm · esc cancel");
+        output ~= mutedStyle.render(
+                "↑/↓ pick · type a custom value · enter confirm · esc cancel");
         return newView(output.data);
     }
 }
@@ -324,8 +324,8 @@ private final class AskModel : Model
     {
         if (done)
             return newView("  " ~ okStyle.render("✓ ") ~ input.value ~ "\n");
-        return newView(accentStyle.render(prompt) ~ " " ~ input.view() ~ "\n"
-                ~ mutedStyle.render("enter to confirm · esc to cancel"));
+        return newView(accentStyle.render(prompt) ~ " " ~ input.view() ~ "\n" ~ mutedStyle.render(
+                "enter to confirm · esc to cancel"));
     }
 }
 
@@ -402,17 +402,16 @@ private final class ConfirmModel : Model
 
         if (answered)
             return newView(result
-                    ? "  " ~ okStyle.render("✓ yes") ~ "\n"
-                    : "  " ~ errStyle.render("✗ no") ~ "\n");
+                    ? "  " ~ okStyle.render("✓ yes") ~ "\n" : "  " ~ errStyle.render(
+                        "✗ no") ~ "\n");
 
-        auto selected = newStyle().foreground(colorText).background(colorPrimary)
-            .bold().padding(0, 2);
+        auto selected = newStyle().foreground(colorText)
+            .background(colorPrimary).bold().padding(0, 2);
         auto plain = newStyle().foreground(colorMuted).padding(0, 2);
         const yesButton = yes ? selected.render("Yes") : plain.render("Yes");
         const noButton = yes ? plain.render("No") : selected.render("No");
-        return newView(accentStyle.render(question) ~ "\n"
-                ~ yesButton ~ "  " ~ noButton ~ "\n"
-                ~ mutedStyle.render("←/→ toggle · y/n · enter"));
+        return newView(accentStyle.render(question) ~ "\n" ~ yesButton ~ "  "
+                ~ noButton ~ "\n" ~ mutedStyle.render("←/→ toggle · y/n · enter"));
     }
 }
 

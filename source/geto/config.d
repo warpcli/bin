@@ -240,7 +240,7 @@ void checkAndLoad()
             if (binary is null)
                 continue;
             if (binary.versionText.length > 0 || binary.hash.length > 0
-                || binary.packagePath.length > 0 || binary.pinned)
+                    || binary.packagePath.length > 0 || binary.pinned)
             {
                 needsMigration = true;
                 break;
@@ -257,7 +257,7 @@ void checkAndLoad()
     const urlsChanged = normalizeManifestUrls();
     const providersChanged = normalizeProviders();
     if (urlsChanged || providersChanged || defaultPathChanged || pathsChanged
-        || keysChanged || mergeChanged || preTags || tagsChanged || remoteNameInManifest)
+            || keysChanged || mergeChanged || preTags || tagsChanged || remoteNameInManifest)
         writeAll();
 
     debugf("Download path set to %s", cfg.defaultPath);
@@ -268,7 +268,8 @@ private void prepareConfigDir(string dir, bool systemConfig)
     if (systemConfig)
     {
         if (!dir.exists)
-            throw new ConfigException("system config directory " ~ dir
+            throw new ConfigException(
+                    "system config directory " ~ dir
                     ~ " does not exist; create /etc/geto/list.json or set GETO_CONFIG_FILE");
         if (!dir.isDir)
             throw new ConfigException("system config path " ~ dir ~ " is not a directory");
@@ -283,7 +284,8 @@ private void prepareConfigDir(string dir, bool systemConfig)
 private JSONValue readManifest(string path, bool systemConfig)
 {
     if (systemConfig && !path.exists)
-        throw new ConfigException("system config file " ~ path
+        throw new ConfigException(
+                "system config file " ~ path
                 ~ " does not exist; create it with Nix or set GETO_CONFIG_FILE");
     if (!path.exists)
     {
@@ -340,20 +342,20 @@ private void ensureRuntimeDirs(string statePath)
     try
         mkdirRecurse(statePath.dirName);
     catch (Exception failure)
-        throw new ConfigException("error creating state directory " ~ statePath.dirName
-                ~ ": " ~ failure.msg);
+        throw new ConfigException(
+                "error creating state directory " ~ statePath.dirName ~ ": " ~ failure.msg);
     if (cfg.defaultPath.length == 0)
         return;
     auto target = isSystemMode() ? cfg.defaultPath : expandEnv(cfg.defaultPath);
     try
         mkdirRecurse(target);
     catch (Exception failure)
-        throw new ConfigException("error creating default install directory " ~ target
-                ~ ": " ~ failure.msg);
+        throw new ConfigException(
+                "error creating default install directory " ~ target ~ ": " ~ failure.msg);
 }
 
 private bool loadState(string configPath, string primaryPath,
-    ref StateEntry[string] entries, out string loadedPath)
+        ref StateEntry[string] entries, out string loadedPath)
 {
     foreach (candidate; stateReadPaths(configPath, primaryPath))
     {
@@ -499,7 +501,8 @@ private void validateSystemPath(string label, string path)
     if (path.length == 0)
         return;
     if (path.canFind('$') || path.startsWith("~"))
-        throw new ConfigException("system " ~ label
+        throw new ConfigException(
+                "system " ~ label
                 ~ " must be absolute and must not use shell/home expansion: " ~ path);
     if (!path.isAbsolute)
         throw new ConfigException("system " ~ label ~ " must be absolute: " ~ path);
@@ -982,16 +985,14 @@ private string defaultInstallPath()
 
 private bool hasConfigPathOverride()
 {
-    return overrides.configFile.length > 0
-        || environment.get("GETO_CONFIG_FILE", "").length > 0
-        || environment.get("GETO_CONFIG_HOME", "").length > 0;
+    return overrides.configFile.length > 0 || environment.get("GETO_CONFIG_FILE",
+            "").length > 0 || environment.get("GETO_CONFIG_HOME", "").length > 0;
 }
 
 private bool hasStatePathOverride()
 {
-    return overrides.stateFile.length > 0
-        || environment.get("GETO_STATE_FILE", "").length > 0
-        || environment.get("GETO_STATE_HOME", "").length > 0;
+    return overrides.stateFile.length > 0 || environment.get("GETO_STATE_FILE",
+            "").length > 0 || environment.get("GETO_STATE_HOME", "").length > 0;
 }
 
 bool isSystemMode()
@@ -1103,10 +1104,10 @@ version (unittest)
 
             setPathOverrides(PathOverrides.init);
             foreach (name_; [
-                    "GETO_CONFIG_FILE", "GETO_CONFIG_HOME", "GETO_STATE_FILE",
-                    "GETO_STATE_HOME", "GETO_DEFAULT_PATH", "XDG_CONFIG_HOME",
-                    "XDG_STATE_HOME", "XDG_DATA_HOME"
-                ])
+                "GETO_CONFIG_FILE", "GETO_CONFIG_HOME", "GETO_STATE_FILE",
+                "GETO_STATE_HOME", "GETO_DEFAULT_PATH", "XDG_CONFIG_HOME",
+                "XDG_STATE_HOME", "XDG_DATA_HOME"
+            ])
                 environment.remove(name_);
             environment["HOME"] = sandbox.root;
             effectiveUid = () => uid;
@@ -1143,9 +1144,9 @@ unittest
     checkAndLoad();
     assert(cfg.defaultPath == buildPath(sandbox.root, ".local", "bin"));
     foreach (dir; [
-            buildPath(sandbox.root, ".local", "bin"),
-            buildPath(sandbox.root, ".local", "state", "geto")
-        ])
+        buildPath(sandbox.root, ".local", "bin"),
+        buildPath(sandbox.root, ".local", "state", "geto")
+    ])
         assert(dir.exists && dir.isDir, dir);
 }
 

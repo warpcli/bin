@@ -46,15 +46,12 @@ private struct ApplySpec
 
 Command applyCommand()
 {
-    auto command = new Command("apply", "Apply a declarative binary manifest",
-        "<desired.json>");
-    command.withFlags(
-        boolFlag(&applyOpts.nonInteractive, "non-interactive", "",
-            "fail instead of prompting when a choice is ambiguous"),
-        boolFlag(&applyOpts.force, "force", "f", "reinstall every declared binary"),
-        boolFlag(&applyOpts.refresh, "refresh", "",
-            "resolve latest versions instead of reusing existing pinned state"),
-    );
+    auto command = new Command("apply", "Apply a declarative binary manifest", "<desired.json>");
+    command.withFlags(boolFlag(&applyOpts.nonInteractive, "non-interactive",
+            "", "fail instead of prompting when a choice is ambiguous"),
+            boolFlag(&applyOpts.force, "force", "f", "reinstall every declared binary"),
+            boolFlag(&applyOpts.refresh, "refresh",
+                "", "resolve latest versions instead of reusing existing pinned state"),);
     command.withAction(&runApply);
     return command;
 }
@@ -75,7 +72,7 @@ private void runApply(string[] args)
         cfg.defaultPath = declaredPath;
     if (cfg.defaultPath.length == 0)
         throw new CommandException(
-            "desired manifest needs default_path or an existing geto default path");
+                "desired manifest needs default_path or an existing geto default path");
     mkdirRecurse(expandEnv(cfg.defaultPath));
 
     foreach (key, node; binsNode.objectNoRef)

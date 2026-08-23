@@ -60,7 +60,7 @@ bool patchForHost(string path)
 
 /// Applies interpreter and library fixes, returning the resulting hash.
 ubyte[] applyHostPatches(string path, Sidecar[string] libs, bool wanted,
-    ubyte[] currentHash, out bool changed)
+        ubyte[] currentHash, out bool changed)
 {
     changed = false;
     if (!wanted)
@@ -124,8 +124,8 @@ bool makeRunnable(string binaryPath, Sidecar[string] libs)
         }
     if (archiveHas)
     {
-        const libDir = buildNormalizedPath(buildPath(binaryPath.dirName, "..", "lib",
-                binaryPath.baseName));
+        const libDir = buildNormalizedPath(buildPath(binaryPath.dirName, "..",
+                "lib", binaryPath.baseName));
         writeSidecars(libDir, libs);
         addDir(libDir);
         infof("installed %d bundled libs → %s", libs.length, libDir);

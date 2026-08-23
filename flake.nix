@@ -90,7 +90,6 @@
             pkgs.dub
             pkgs.dtools
             pkgs.dscanner
-            pkgs.dfmt
             pkgs.serve-d
             pkgs.dub-to-nix
             pkgs.git-cliff

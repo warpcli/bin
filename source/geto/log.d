@@ -21,7 +21,9 @@ enum Level
 
 private enum defaultPadding = 2;
 
-private immutable string[5] levelNames = ["debug", "info", "warn", "error", "fatal"];
+private immutable string[5] levelNames = [
+    "debug", "info", "warn", "error", "fatal"
+];
 private immutable string[5] levelSymbols = ["•", "•", "•", "⨯", "⨯"];
 private immutable ubyte[5] levelColors = [15, 12, 11, 9, 9];
 
@@ -133,7 +135,8 @@ private string paint(Level level, string text)
 {
     if (!state.color)
         return text;
-    return newStyle().foreground(extendedColor(levelColors[cast(size_t) level])).bold().render(text);
+    return newStyle().foreground(extendedColor(levelColors[cast(size_t) level])).bold()
+        .render(text);
 }
 
 private string rightAlign(string text, int width)

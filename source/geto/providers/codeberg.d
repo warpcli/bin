@@ -69,7 +69,7 @@ final class Codeberg : Provider
         Asset[] candidates;
         foreach (attachment; release.jitems("assets"))
             candidates ~= new Asset(attachment.jstr("name"), "",
-                attachment.jstr("browser_download_url"));
+                    attachment.jstr("browser_download_url"));
 
         auto filter = new Filter(toFilterOpts(opts));
         auto chosen = filter.selectReleaseAsset(repo, candidates);

@@ -39,18 +39,18 @@ private InstallOpts installOpts;
 
 Command installCommand()
 {
-    auto command = new Command("install", "Installs the specified binary from a url",
-        "<url> [name | path]");
+    auto command = new Command("install",
+            "Installs the specified binary from a url", "<url> [name | path]");
     command.withAliases("i", "add");
-    command.withFlags(
-        boolFlag(&installOpts.force, "force", "f",
+    command.withFlags(boolFlag(&installOpts.force, "force", "f",
             "Force the installation even if the file already exists"),
-        boolFlag(&installOpts.all, "all", "a",
-            "Show all possible download options (skip scoring & filtering)"),
-        textFlag(&installOpts.provider, "provider", "p", "Forces to use a specific provider"),
-        boolFlag(&installOpts.noPatch, "no-patch", "",
-            "Don't auto-fix the ELF interpreter / bundled libs for this host"),
-    );
+            boolFlag(&installOpts.all, "all", "a",
+                "Show all possible download options (skip scoring & filtering)"),
+            textFlag(&installOpts.provider, "provider", "p",
+                "Forces to use a specific provider"),
+            boolFlag(&installOpts.noPatch,
+                "no-patch", "", "Don't auto-fix the ELF interpreter / bundled libs for this host"),
+            );
     command.withAction(&runInstall);
     return command;
 }
@@ -83,8 +83,7 @@ private void runInstall(string[] args)
     fetchOpts.collectLibs = !installOpts.noPatch;
     auto result = provider.fetch(fetchOpts);
 
-    resolvedPath = checkFinalPath(resolvedPath,
-        sanitizeName(result.name, result.versionText));
+    resolvedPath = checkFinalPath(resolvedPath, sanitizeName(result.name, result.versionText));
 
     auto hash = saveToDisk(result, resolvedPath, installOpts.force);
 
@@ -141,17 +140,18 @@ private void runList(string[] args)
         auto binary = bins[key];
         const path = expandEnv(binary.path);
         rows ~= ListRow(path, binary.versionText, binTags(binary), binary.url,
-            path.exists, binary.pinned);
+                path.exists, binary.pinned);
     }
 
     const scope_ = tagFilterAll() ? "all" : wantedTags().join(",");
     writefln("\n%s  %s\n", banner(" geto "),
-        mutedStyle.render(format("%d binaries · tag: %s", rows.length, scope_)));
+            mutedStyle.render(format("%d binaries · tag: %s", rows.length, scope_)));
 
     if (rows.length == 0)
     {
-        writefln("%s\n", mutedStyle.render(
-                "nothing here — try a different --tag, or `geto install <url>`"));
+        writefln("%s\n",
+                mutedStyle.render(
+                    "nothing here — try a different --tag, or `geto install <url>`"));
         return;
     }
 
@@ -177,21 +177,20 @@ private UpdateOpts updateOpts;
 
 Command updateCommand()
 {
-    auto command = new Command("update", "Updates one or multiple binaries managed by geto",
-        "[binary_path]");
+    auto command = new Command("update",
+            "Updates one or multiple binaries managed by geto", "[binary_path]");
     command.withAliases("u", "up", "upgrade");
-    command.withFlags(
-        boolFlag(&updateOpts.dryRun, "dry-run", "", "Only show status, don't prompt for update"),
-        boolFlag(&updateOpts.yes, "yes", "y", "Assume yes to update prompt"),
-        boolFlag(&updateOpts.all, "all", "a",
-            "Show all possible download options (skip scoring & filtering)"),
-        boolFlag(&updateOpts.skipPathCheck, "skip-path-check", "p",
-            "Skips path checking when looking into packages"),
-        boolFlag(&updateOpts.continueOnError, "continue-on-error", "c",
-            "Continues to update next package if an error is encountered"),
-        boolFlag(&updateOpts.recheck, "recheck", "r",
-            "Re-prompt for asset selection instead of reusing the remembered choice"),
-    );
+    command.withFlags(boolFlag(&updateOpts.dryRun, "dry-run", "", "Only show status, don't prompt for update"),
+            boolFlag(&updateOpts.yes, "yes", "y", "Assume yes to update prompt"),
+            boolFlag(&updateOpts.all, "all", "a",
+                "Show all possible download options (skip scoring & filtering)"),
+            boolFlag(&updateOpts.skipPathCheck,
+                "skip-path-check", "p", "Skips path checking when looking into packages"),
+            boolFlag(&updateOpts.continueOnError, "continue-on-error", "c",
+                "Continues to update next package if an error is encountered"),
+            boolFlag(&updateOpts.recheck,
+                "recheck", "r",
+                "Re-prompt for asset selection instead of reusing the remembered choice"),);
     command.withAction(&runUpdate);
     return command;
 }
@@ -238,7 +237,7 @@ private void runUpdate(string[] args)
             if (!updateOpts.continueOnError)
                 throw failure;
             failures ~= format("Error while getting latest version of %s: %s",
-                binary.path, failure.msg);
+                    binary.path, failure.msg);
         }
     }
 
@@ -329,8 +328,8 @@ private bool findNewerVersion(Binary binary, Provider provider, out UpdateInfo i
         return false;
 
     debugf("Found new version %s for %s at %s", tag, binary.path, url);
-    infof("%s %s -> %s (%s)", binary.path, warnStyle.render(binary.versionText),
-        okStyle.render(tag), url);
+    infof("%s %s -> %s (%s)", binary.path,
+            warnStyle.render(binary.versionText), okStyle.render(tag), url);
     info = UpdateInfo(binary, tag, url);
     return true;
 }
@@ -342,8 +341,7 @@ private bool findNewerVersion(Binary binary, Provider provider, out UpdateInfo i
 Command ensureCommand()
 {
     auto command = new Command("ensure",
-        "Ensures that all binaries listed in the configuration are present",
-        "[binary_path]...");
+            "Ensures that all binaries listed in the configuration are present", "[binary_path]...");
     command.withAliases("e", "sync");
     command.withAction(&runEnsure);
     return command;
@@ -436,7 +434,7 @@ private bool removeYes;
 Command removeCommand()
 {
     auto command = new Command("remove", "Removes binaries managed by geto",
-        "[<name> | <paths...>]");
+            "[<name> | <paths...>]");
     command.withAliases("rm", "uninstall", "delete");
     command.withFlags(boolFlag(&removeYes, "yes", "y", "Skip the confirmation prompt"));
     command.withAction(&runRemove);
@@ -465,7 +463,7 @@ private void runRemove(string[] args)
         {
             const path = expandEnv(binary.path);
             if ((resolved.length > 0 && path == expandEnv(resolved))
-                || argument == binary.path || argument == path || path.baseName == argument)
+                    || argument == binary.path || argument == path || path.baseName == argument)
             {
                 match = binary;
                 break;
@@ -558,15 +556,15 @@ private void runPrune(string[] args)
 Command pinCommand()
 {
     auto command = new Command("pin", "Pins current version of the binaries",
-        "[<name> | <paths...>]");
+            "[<name> | <paths...>]");
     command.withAction((string[] args) { setPinned(args, true); });
     return command;
 }
 
 Command unpinCommand()
 {
-    auto command = new Command("unpin", "Unpins current version of the binaries",
-        "[<name> | <paths...>]");
+    auto command = new Command("unpin",
+            "Unpins current version of the binaries", "[<name> | <paths...>]");
     command.withAction((string[] args) { setPinned(args, false); });
     return command;
 }
@@ -613,8 +611,8 @@ string describeBinary(string url, string provider)
 
 Command describeCommand()
 {
-    auto command = new Command("describe", "Fetch and store repository descriptions",
-        "[<name> | <paths...>]");
+    auto command = new Command("describe",
+            "Fetch and store repository descriptions", "[<name> | <paths...>]");
     command.withAliases("desc");
     command.withFlags(boolFlag(&describeForce, "force", "f",
             "Refetch even if a description already exists"));
@@ -738,7 +736,7 @@ private void runTagAdd(string[] args)
             binary.tags = binTags(binary) ~ tag;
         upsertBinary(binary);
         infof("Tagged %s with %s (now: %s)", expandEnv(binary.path),
-            okStyle.render(tag), binary.tags.join(", "));
+                okStyle.render(tag), binary.tags.join(", "));
     }
 }
 
@@ -757,7 +755,7 @@ private void runTagRemove(string[] args)
         binary.tags = kept.length == 0 ? ["default"] : kept;
         upsertBinary(binary);
         infof("Removed tag %s from %s (now: %s)", warnStyle.render(tag),
-            expandEnv(binary.path), binary.tags.join(", "));
+                expandEnv(binary.path), binary.tags.join(", "));
     }
 }
 

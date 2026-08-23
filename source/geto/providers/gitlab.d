@@ -70,8 +70,7 @@ final class GitLab : Provider
         auto project = parseJSON(getOrThrow(projectUrl(), authHeaders()).text);
 
         const visibility = project.jstr("visibility");
-        const projectIsPublic = token.length == 0 || visibility.length == 0
-            || visibility == "public";
+        const projectIsPublic = token.length == 0 || visibility.length == 0 || visibility == "public";
         debugf("Project is public: %s", projectIsPublic);
 
         Asset[] candidates;
@@ -104,8 +103,8 @@ final class GitLab : Provider
             // The Go build keyed this off the markdown title attribute; keeping
             // that means links without one stay unnamed.
             if (projectIsPublic || !link.destination.startsWith(uploadsPrefix))
-                addCandidate(link.title, link.title ~ " (from release description)",
-                    link.destination);
+                addCandidate(link.title,
+                        link.title ~ " (from release description)", link.destination);
         }
 
         auto filter = new Filter(toFilterOpts(opts));
@@ -128,11 +127,10 @@ final class GitLab : Provider
     }
 
     /// Adds every file of the package whose version matches the release tag.
-    private void collectPackageFiles(string tagName,
-        void delegate(string, string, string) addCandidate)
+    private void collectPackageFiles(string tagName, void delegate(string,
+            string, string) addCandidate)
     {
-        auto response = get(projectUrl() ~ "/packages?order_by=version&sort=desc",
-            authHeaders());
+        auto response = get(projectUrl() ~ "/packages?order_by=version&sort=desc", authHeaders());
         if (response.status == 403)
             return;
         if (!response.ok)
@@ -156,17 +154,15 @@ final class GitLab : Provider
                 import std.conv : to;
 
                 auto filesResponse = getOrThrow(projectUrl() ~ "/packages/"
-                        ~ id.to!string ~ "/package_files?page=" ~ page.to!string,
-                        authHeaders());
+                        ~ id.to!string ~ "/package_files?page=" ~ page.to!string, authHeaders());
                 auto files = parseJSON(filesResponse.text).arrayNoRef;
                 if (files.length == 0)
                     break;
                 foreach (file; files)
                 {
                     const fileName = file.jstr("file_name");
-                    const assetUrl = apiBase ~ "/projects/" ~ urlEscape(projectPath())
-                        ~ "/packages/" ~ packageType ~ "/" ~ packageName ~ "/"
-                        ~ packageVersion ~ "/" ~ fileName;
+                    const assetUrl = apiBase ~ "/projects/" ~ urlEscape(projectPath()) ~ "/packages/"
+                        ~ packageType ~ "/" ~ packageName ~ "/" ~ packageVersion ~ "/" ~ fileName;
                     addCandidate(fileName, fileName ~ " (" ~ packageType ~ " package)", assetUrl);
                 }
                 page++;

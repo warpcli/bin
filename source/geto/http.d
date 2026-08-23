@@ -84,8 +84,8 @@ ubyte[] download(string url, const string[string] headers, string label, bool qu
     {
         auto response = request.get(url);
         if (response.code < 200 || response.code > 299)
-            throw new HttpException(response.code.to!string
-                    ~ " response when checking binary from " ~ url, response.code);
+            throw new HttpException(response.code.to!string ~ " response when checking binary from " ~ url,
+                    response.code);
 
         auto bar = ProgressBar(response.contentLength, label);
         scope (exit)

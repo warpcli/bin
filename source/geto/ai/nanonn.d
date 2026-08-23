@@ -78,7 +78,8 @@ final class Dense : Layer
         {
             errorValues[j] = 0;
             foreach (i; 0 .. outputs)
-                errorValues[j] += errors[i] * dsigmoid(outputValues[i]) * weightValues[i * stride + j];
+                errorValues[j] += errors[i] * dsigmoid(outputValues[i]) * weightValues[i * stride
+                + j];
         }
         foreach (i; 0 .. outputs)
         {

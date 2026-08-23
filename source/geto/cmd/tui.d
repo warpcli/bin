@@ -14,10 +14,8 @@ import std.string : strip, toLower;
 import mochafizz.ansi.color : Color;
 import mochafizz.ansi.width : stringWidth;
 import mochafizz.ansi.wrap : truncate;
-import mochafizz.bubbles.spinner : Spinner, SpinnerTickMsg, newSpinner, tickCmd,
-    update, view;
-import mochafizz.bubbles.textinput : TextInput, newTextInput, setValue, update,
-    value, view;
+import mochafizz.bubbles.spinner : Spinner, SpinnerTickMsg, newSpinner, tickCmd, update, view;
+import mochafizz.bubbles.textinput : TextInput, newTextInput, setValue, update, value, view;
 import mochafizz.style : Align, Style, aligned, background, bold, foreground,
     italic, newStyle, padding, render, width, withBorder;
 import mochafizz.tea.cmd : Batch, Cmd, Quit, Tick;
@@ -505,8 +503,8 @@ private final class TuiModel : Model
                 return ModelUpdate(this, null);
             row.binary.pinned = !row.binary.pinned;
             upsertBinary(row.binary);
-            return ModelUpdate(this, setStatus((row.binary.pinned ? "pinned " : "unpinned ")
-                    ~ row.path.baseName));
+            return ModelUpdate(this, setStatus((row.binary.pinned
+                    ? "pinned " : "unpinned ") ~ row.path.baseName));
         }
         if (key.matchString("e"))
         {
@@ -522,8 +520,7 @@ private final class TuiModel : Model
             try
                 forgetBinarySelection(row.binary.path);
             catch (Exception failure)
-                return ModelUpdate(this, setStatus(
-                        errStyle.render("forget failed: " ~ failure.msg)));
+                return ModelUpdate(this, setStatus(errStyle.render("forget failed: " ~ failure.msg)));
             if (auto stored = row.binary.path in get().bins)
                 row.binary = *stored;
             row.note = okStyle.render("forgot choice");
@@ -574,10 +571,9 @@ private final class TuiModel : Model
             row.note = mutedStyle.render("updating…");
             busy++;
             return ModelUpdate(this, Batch([
-                    performUpdateCommand(row.binary),
-                    startSpinner(),
-                    setStatus("updating " ~ row.path.baseName ~ "…"),
-                ]));
+                performUpdateCommand(row.binary), startSpinner(),
+                setStatus("updating " ~ row.path.baseName ~ "…"),
+            ]));
         }
         return ModelUpdate(this, null);
     }
@@ -673,9 +669,7 @@ private final class TuiModel : Model
     private void startEdit(BinRow row)
     {
         const values = [
-            row.binary.url,
-            row.binary.provider,
-            binTags(row.binary).join(","),
+            row.binary.url, row.binary.provider, binTags(row.binary).join(","),
             row.binary.description,
         ];
         inputs = new TextInput[editFields.length];
@@ -783,8 +777,7 @@ private final class TuiModel : Model
             output ~= "\n";
 
         output ~= pad ~ renderStatusBar() ~ "\n";
-        output ~= pad ~ mutedStyle.render(
-            "↑/↓ move · u update · r check all · p pin · e edit · m forget · o open · d remove · t tag · / filter · q quit");
+        output ~= pad ~ mutedStyle.render("↑/↓ move · u update · r check all · p pin · e edit · m forget · o open · d remove · t tag · / filter · q quit");
         return output.data;
     }
 
@@ -862,23 +855,23 @@ private final class TuiModel : Model
 
         enum versionColumn = 28;
         const nameColumn = inner - 2 - versionColumn;
-        const line1 = line(bar ~ cell(statusFg, 2, "●", false, false)
-                ~ cell(nameFg, nameColumn, name, false, true)
-                ~ cell(versionFg, versionColumn, versionText, true, false));
+        const line1 = line(bar ~ cell(statusFg, 2, "●", false,
+                false) ~ cell(nameFg, nameColumn, name, false,
+                true) ~ cell(versionFg, versionColumn, versionText, true, false));
 
         enum archColumn = 8, libcColumn = 8, sizeColumn = 9, tagsColumn = 18;
         const repoColumn = inner - archColumn - libcColumn - sizeColumn - tagsColumn;
-        const line2 = line(bar ~ cell(colorTag, repoColumn, repoShort(row.binary.url), false, false)
-                ~ cell(colorMuted, archColumn, dash(row.arch), false, false)
-                ~ cell(colorMuted, libcColumn, dash(row.libc), false, false)
-                ~ cell(colorMuted, sizeColumn, sizeText(row.size), false, false)
-                ~ cell(colorTag, tagsColumn, binTags(row.binary).join(","), false, false));
+        const line2 = line(bar ~ cell(colorTag, repoColumn, repoShort(row.binary.url),
+                false, false) ~ cell(colorMuted, archColumn, dash(row.arch),
+                false, false) ~ cell(colorMuted, libcColumn, dash(row.libc), false,
+                false) ~ cell(colorMuted, sizeColumn, sizeText(row.size), false,
+                false) ~ cell(colorTag, tagsColumn, binTags(row.binary).join(","), false, false));
 
         auto info = row.binary.description;
         if (info.length == 0)
             info = row.path;
-        const line3 = line(bar ~ base().foreground(colorMuted).italic().width(inner)
-                .render(clip(info, inner)));
+        const line3 = line(bar ~ base().foreground(colorMuted).italic()
+                .width(inner).render(clip(info, inner)));
 
         return line1 ~ "\n" ~ line2 ~ "\n" ~ line3;
     }
@@ -886,9 +879,9 @@ private final class TuiModel : Model
     private string confirmDialog()
     {
         const name = confirmTarget.baseName;
-        const body_ = mutedStyle.render("Remove ") ~ accentStyle.render(name)
-            ~ mutedStyle.render(" and forget it?") ~ "\n\n"
-            ~ "  " ~ button("Yes", confirmYes) ~ "   " ~ button("No", !confirmYes);
+        const body_ = mutedStyle.render("Remove ") ~ accentStyle.render(name) ~ mutedStyle.render(
+                " and forget it?") ~ "\n\n" ~ "  " ~ button("Yes",
+                confirmYes) ~ "   " ~ button("No", !confirmYes);
         return dialog("Remove binary", body_, "←/→ choose · y/n · enter");
     }
 
@@ -900,14 +893,14 @@ private final class TuiModel : Model
             auto label = "  " ~ mutedStyle.render(editFields[i]);
             if (i == editFocus)
                 label = accentStyle.render("▸ " ~ editFields[i]);
-            auto field = newStyle().withBorder(roundedBorder()).padding(0, 1).width(56)
-                .foreground(i == editFocus ? colorPrimary : colorMuted);
+            auto field = newStyle().withBorder(roundedBorder()).padding(0, 1)
+                .width(56).foreground(i == editFocus ? colorPrimary : colorMuted);
             output ~= label ~ "\n" ~ field.render(inputs[i].view());
             if (i + 1 < inputs.length)
                 output ~= "\n";
         }
         return dialog("Edit  " ~ editRow.path.baseName, output.data,
-            "tab/↑↓ move · enter save · esc cancel");
+                "tab/↑↓ move · enter save · esc cancel");
     }
 }
 

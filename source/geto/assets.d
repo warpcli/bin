@@ -33,9 +33,9 @@ bool quiet;
 /// Platform lookup, indirected so tests can pretend to be another host.
 struct PlatformResolver
 {
-    string[] delegate() os;
-    string[] delegate() arch;
-    string[] delegate() osExtensions;
+    string[]delegate() os;
+    string[]delegate() arch;
+    string[]delegate() osExtensions;
 }
 
 private PlatformResolver resolver;
@@ -48,8 +48,7 @@ shared static this()
 /// Restores the real host platform.
 void resetResolver()
 {
-    resolver = PlatformResolver(() => getOs(), () => getArch(),
-        () => getOsSpecificExtensions());
+    resolver = PlatformResolver(() => getOs(), () => getArch(), () => getOsSpecificExtensions());
 }
 
 /// Overrides the platform, for tests.
@@ -287,11 +286,8 @@ string[] fingerprint(Asset[] assets)
 
 /// Archive and compression formats geto can unpack.
 private immutable string[] installableSuffixes = [
-    ".tar.gz", ".tgz",
-    ".tar.xz", ".txz",
-    ".tar.bz2", ".tbz2", ".tbz",
-    ".tar.zst", ".tzst",
-    ".tar", ".zip", ".gz", ".xz", ".bz2", ".zst",
+    ".tar.gz", ".tgz", ".tar.xz", ".txz", ".tar.bz2", ".tbz2", ".tbz",
+    ".tar.zst", ".tzst", ".tar", ".zip", ".gz", ".xz", ".bz2", ".zst",
 ];
 
 /// Extensions that are never an installable binary.
@@ -301,19 +297,20 @@ shared static this()
 {
     bool[string] ignored;
     foreach (name; [
-            "sha256", "sha512", "sha1", "md5", "sum", "checksum", "sig",
-            "sigstore", "asc", "gpg", "pem", "pub", "crt", "cert", "minisig",
-            "sbom", "spdx", "cdx", "intoto", "jsonl", "json", "txt", "md",
-            "yaml", "yml", "deb", "rpm", "msi", "pkg", "dmg", "apk", "snap",
-            "flatpak", "whl",
-            // libraries and object files are never the CLI binary we want.
-            "a", "o", "so", "dll", "dylib", "lib"
-        ])
+        "sha256", "sha512", "sha1", "md5", "sum", "checksum", "sig", "sigstore",
+        "asc", "gpg", "pem", "pub", "crt", "cert", "minisig", "sbom", "spdx",
+        "cdx", "intoto", "jsonl", "json", "txt", "md", "yaml", "yml", "deb",
+        "rpm", "msi", "pkg", "dmg", "apk", "snap", "flatpak", "whl",
+        // libraries and object files are never the CLI binary we want.
+        "a", "o", "so", "dll", "dylib", "lib"
+    ])
         ignored[name] = true;
     ignoredExts = cast(immutable) ignored;
 }
 
-private immutable string[] ignoredNameSuffixes = ["-update", "_update", ".update"];
+private immutable string[] ignoredNameSuffixes = [
+    "-update", "_update", ".update"
+];
 
 private immutable string[][] archAliasGroups = [
     ["amd64", "x86_64", "x86-64", "x64", "intel_64", "intel64"],
@@ -345,8 +342,7 @@ bool isUsableAsset(string name)
     {
         if (ext in ignoredExts)
             return false;
-        if (ext == "exe" || ext == "appimage" || ext == "dmg")
-            // Executables for another OS; the current-OS ones were kept above.
+        if (ext == "exe" || ext == "appimage" || ext == "dmg") // Executables for another OS; the current-OS ones were kept above.
             return false;
     }
     // Everything else stays; scoring decides the best match.
@@ -498,19 +494,18 @@ private string archiveStem(string name, out bool isTar, out bool isZip)
 Asset[] preferArchiveType(Asset[] assets)
 {
     bool preferTar = false;
-    foreach (name; resolver.os())
-        switch (name)
-        {
-        case "linux":
-        case "freebsd":
-        case "openbsd":
-        case "netbsd":
-        case "dragonfly":
-            preferTar = true;
-            break;
-        default:
-            break;
-        }
+    foreach (name; resolver.os()) switch (name)
+    {
+    case "linux":
+    case "freebsd":
+    case "openbsd":
+    case "netbsd":
+    case "dragonfly":
+        preferTar = true;
+        break;
+    default:
+        break;
+    }
 
     static struct Group
     {
@@ -641,7 +636,8 @@ final class Filter
                     debugf("Using requested asset %s", asset.name);
                     return makeFiltered(repoName, asset, marks);
                 }
-            throw new AssetException("requested asset " ~ opts.wantedAsset
+            throw new AssetException(
+                    "requested asset " ~ opts.wantedAsset
                     ~ " not found in compatible release assets");
         }
 
@@ -771,12 +767,13 @@ final class Filter
         if (auto chosen = aiPick(repoName, matches))
         {
             infof("Selected %s from %d equally-scored assets %s; run `geto update -r %s` to change it",
-                chosen.name, matches.length, aiBasis(), repoName);
+                    chosen.name, matches.length, aiBasis(), repoName);
             return chosen;
         }
 
         if (opts.nonInteractive)
-            throw new AssetException("multiple matching assets and running non-interactively; run `geto update -r "
+            throw new AssetException(
+                    "multiple matching assets and running non-interactively; run `geto update -r "
                     ~ repoName ~ "` to choose");
 
         string[] labels;
@@ -909,8 +906,8 @@ final class Filter
                     debugf("Using requested package path %s", asset.name);
                     return asset.name;
                 }
-            throw new AssetException("requested package path " ~ opts.wantedPackagePath
-                    ~ " not found in archive");
+            throw new AssetException(
+                    "requested package path " ~ opts.wantedPackagePath ~ " not found in archive");
         }
 
         if (!opts.recheck && !opts.skipPathCheck && opts.packagePath.length > 0)
@@ -922,7 +919,7 @@ final class Filter
                     if (normalizeAssetName(asset.name) == wanted)
                     {
                         debugf("Reusing remembered package %s as %s (layout unchanged)",
-                            opts.packagePath, asset.name);
+                                opts.packagePath, asset.name);
                         return asset.name;
                     }
                 debugf("Remembered package %s not found; re-selecting", opts.packagePath);
@@ -949,8 +946,7 @@ private bool isSharedLib(string path)
 /// Resolves the transitive DT_NEEDED closure of `binary` against the shared
 /// libraries in the same archive, following symlinks. System libraries that
 /// the archive does not ship are skipped.
-Sidecar[string] collectLibClosure(ubyte[] binary, ubyte[][string] files,
-    const string[string] links)
+Sidecar[string] collectLibClosure(ubyte[] binary, ubyte[][string] files, const string[string] links)
 {
     ubyte[][string] fileByBase;
     foreach (path, data; files)
@@ -1081,7 +1077,7 @@ private int packageNameRank(string assetName, string packageName)
         if (i == 0)
         {
             if (nameTokens.length == packageTokens.length
-                || isPlatformOrVersionToken(nameTokens[packageTokens.length]))
+                    || isPlatformOrVersionToken(nameTokens[packageTokens.length]))
                 return 3;
             return 2;
         }
@@ -1121,12 +1117,10 @@ private bool isPlatformOrVersionToken(string token)
         return true;
     switch (token)
     {
-    case "linux", "windows", "win",
-        "freebsd", "openbsd", "netbsd", "dragonfly",
-        "unknown", "musl", "gnu", "glibc", "static",
-        "amd64", "x86", "x64", "intel", "arm64", "aarch64", "arm",
-        "386", "i386", "i686":
-        return true;
+    case "linux", "windows", "win", "freebsd", "openbsd", "netbsd", "dragonfly", "unknown",
+            "musl", "gnu", "glibc", "static", "amd64", "x86", "x64", "intel",
+            "arm64", "aarch64", "arm", "386", "i386", "i686":
+            return true;
     default:
         return false;
     }
@@ -1149,7 +1143,10 @@ string sanitizeName(string name, string versionText)
     {
         foreach (archName; resolver.arch())
         {
-            pairs ~= ["_" ~ osName ~ archName, "-" ~ osName ~ archName, "." ~ osName ~ archName];
+            pairs ~= [
+                "_" ~ osName ~ archName, "-" ~ osName ~ archName,
+                "." ~ osName ~ archName
+            ];
             if (firstPass)
                 pairs ~= ["_" ~ archName, "-" ~ archName, "." ~ archName];
         }
@@ -1175,12 +1172,16 @@ version (unittest)
 
     private auto linuxAmd64()
     {
-        return fakeResolver(["linux"], ["amd64", "x86_64", "x64", "64"], ["AppImage"]);
+        return fakeResolver(["linux"], ["amd64", "x86_64", "x64", "64"], [
+            "AppImage"
+        ]);
     }
 
     private auto windowsAmd64()
     {
-        return fakeResolver(["windows", "win"], ["amd64", "x86_64", "x64", "64"], ["exe"]);
+        return fakeResolver(["windows", "win"], ["amd64", "x86_64", "x64", "64"], [
+            "exe"
+        ]);
     }
 
     private Asset[] assetsNamed(const string[] names)
@@ -1219,36 +1220,31 @@ unittest
 
     // --- name normalization -------------------------------------------------
     assert(normalizeAssetName("bat-v0.24.0-x86_64-linux.tar.gz") == "bat-v#-x#_#-linux.tar.gz");
-    assert(fingerprint([new Asset("b.tar.gz"), new Asset("a.zip")]) == ["a.zip", "b.tar.gz"]);
+    assert(fingerprint([new Asset("b.tar.gz"), new Asset("a.zip")]) == [
+        "a.zip", "b.tar.gz"
+    ]);
 
     // Same asset across releases must normalize equal.
-    foreach (pair; [
-            ["codex-npm-linux-x64-0.140.0.tgz", "codex-npm-linux-x64-0.141.0.tgz"],
-            ["tool-v1.2.3-linux", "tool-v9.0.0-linux"],
-        ])
-        assert(normalizeAssetName(pair[0]) == normalizeAssetName(pair[1]));
-    assert(normalizeAssetName("codex-x86_64-unknown-linux-musl.tar.gz")
-            != normalizeAssetName("codex-zsh-x86_64-unknown-linux-musl.tar.gz"));
+    assert(normalizeAssetName("codex-npm-linux-x64-0.140.0.tgz") == normalizeAssetName(
+            "codex-npm-linux-x64-0.141.0.tgz"));
+    assert(normalizeAssetName("tool-v1.2.3-linux") == normalizeAssetName("tool-v9.0.0-linux"));
+    assert(normalizeAssetName("codex-x86_64-unknown-linux-musl.tar.gz") != normalizeAssetName(
+            "codex-zsh-x86_64-unknown-linux-musl.tar.gz"));
 
     // --- usability ----------------------------------------------------------
     setResolver(linuxAmd64());
     foreach (name; [
-            "codex-x86_64-unknown-linux-musl.tar.gz",
-            "codex-npm-linux-x64-0.140.0.tgz",
-            "jq-linux64",
-            "tool-v0.140.0",
-            "Ultimaker_Cura-4.8.0.AppImage",
-        ])
+        "codex-x86_64-unknown-linux-musl.tar.gz",
+        "codex-npm-linux-x64-0.140.0.tgz", "jq-linux64", "tool-v0.140.0",
+        "Ultimaker_Cura-4.8.0.AppImage",
+    ])
         assert(isUsableAsset(name), name);
     foreach (name; [
-            "codex-x86_64-unknown-linux-musl.sigstore",
-            "openai_codex_cli_bin-0.140.0-py3-none-manylinux_2_17_x86_64.whl",
-            "checksums.txt",
-            "codex.tar.gz.sha256",
-            "release.sbom.json",
-            "pkg.deb",
-            "tool-update",
-        ])
+        "codex-x86_64-unknown-linux-musl.sigstore",
+        "openai_codex_cli_bin-0.140.0-py3-none-manylinux_2_17_x86_64.whl",
+        "checksums.txt", "codex.tar.gz.sha256", "release.sbom.json", "pkg.deb",
+        "tool-update",
+    ])
         assert(!isUsableAsset(name), name);
 
     assert(isSupportedExt("tool.tar.gz"));
@@ -1260,8 +1256,8 @@ unittest
 
     // --- preference rules ---------------------------------------------------
     assert(preferMusl(assetsNamed([
-            "tool-linux-amd64-musl.tar.gz", "tool-linux-amd64-gnu.tar.gz"
-        ])).length == 1);
+        "tool-linux-amd64-musl.tar.gz", "tool-linux-amd64-gnu.tar.gz"
+    ])).length == 1);
 
     assert(packageNameRank("bat-v0.24.0-x86_64-linux.tar.gz", "bat") == 3);
     assert(packageNameRank("ripgrep.tar.gz", "bat") == 0);
@@ -1283,7 +1279,8 @@ unittest
 
     const cases = [
         Case("bin", [
-            "bin_0.0.1_Linux_x86_64", "bin_0.0.1_Linux_i386", "bin_0.0.1_Darwin_x86_64"
+            "bin_0.0.1_Linux_x86_64", "bin_0.0.1_Linux_i386",
+            "bin_0.0.1_Darwin_x86_64"
         ], "bin_0.0.1_Linux_x86_64", false),
         Case("gitlab-runner", [
             "gitlab-runner-windows-amd64", "gitlab-runner-linux-amd64",
@@ -1294,23 +1291,23 @@ unittest
         ], "yq_linux_amd64", false),
         Case("jq", ["jq-win64.exe", "jq-linux64", "jq-osx-amd64"], "jq-linux64", false),
         Case("tezos", ["x86_64-linux-tezos-binaries.tar.gz"],
-            "x86_64-linux-tezos-binaries.tar.gz", false),
+                "x86_64-linux-tezos-binaries.tar.gz", false),
         Case("launchpad", ["launchpad-linux-x64", "launchpad-win-x64.exe"],
-            "launchpad-linux-x64", false),
+                "launchpad-linux-x64", false),
         Case("usql", [
-            "usql-0.8.2-darwin-amd64.tar.bz2", "usql-0.8.2-linux-amd64.tar.bz2",
-            "usql-0.8.2-windows-amd64.zip"
+            "usql-0.8.2-darwin-amd64.tar.bz2",
+            "usql-0.8.2-linux-amd64.tar.bz2", "usql-0.8.2-windows-amd64.zip"
         ], "usql-0.8.2-linux-amd64.tar.bz2", false),
         Case("cli", ["dapr"], "dapr", false),
         Case("launchpad", ["launchpad-linux-x64", "launchpad-win-x64.exe"],
-            "launchpad-win-x64.exe", true),
+                "launchpad-win-x64.exe", true),
         Case("bin", [
             "bin_0.0.1_Windows_x86_64.exe", "bin_0.1.0_Linux_x86_64",
             "bin_0.1.0_Darwin_x86_64"
         ], "bin_0.0.1_Windows_x86_64.exe", true),
         Case("usql", [
-            "usql-0.8.2-darwin-amd64.tar.bz2", "usql-0.8.2-linux-amd64.tar.bz2",
-            "usql-0.8.2-windows-amd64.zip"
+            "usql-0.8.2-darwin-amd64.tar.bz2",
+            "usql-0.8.2-linux-amd64.tar.bz2", "usql-0.8.2-windows-amd64.zip"
         ], "usql-0.8.2-windows-amd64.zip", true),
     ];
 
@@ -1320,7 +1317,7 @@ unittest
         auto filter = new Filter(FilterOpts.init);
         auto chosen = filter.filterAssets(testCase.repo, assetsNamed(testCase.names));
         assert(chosen.name == testCase.expected,
-            testCase.repo ~ ": got " ~ chosen.name ~ ", want " ~ testCase.expected);
+                testCase.repo ~ ": got " ~ chosen.name ~ ", want " ~ testCase.expected);
     }
 }
 
@@ -1343,8 +1340,8 @@ unittest
 
     // A genuinely new installable file changes the fingerprint, which is what
     // forces the re-prompt.
-    auto extended = codexAssets("0.141.0")
-        ~ new Asset("codex-extra-x86_64-unknown-linux-musl.tar.gz");
+    auto extended = codexAssets("0.141.0") ~ new Asset(
+            "codex-extra-x86_64-unknown-linux-musl.tar.gz");
     assert(fingerprint(filterUsableAssets(extended)) != marks);
 }
 

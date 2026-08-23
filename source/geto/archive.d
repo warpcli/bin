@@ -124,9 +124,8 @@ unittest
 
     import std.range.interfaces : inputRangeObject;
 
-    auto tarball = collect(only(cast(BoxEntry) new InfoBoxEntry(
-            BoxEntryInfo("greeting.txt", EntryType.regular, null,
-            payload.length, SysTime.init, octalAttributes),
+    auto tarball = collect(only(cast(BoxEntry) new InfoBoxEntry(BoxEntryInfo("greeting.txt",
+            EntryType.regular, null, payload.length, SysTime.init, octalAttributes),
             inputRangeObject(only(cast(const(ubyte)[]) payload)))).boxTar());
     auto entries = readTar(tarball);
     assert(entries.length == 1);

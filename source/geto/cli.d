@@ -224,8 +224,7 @@ Command resolve(Command root, string[] args, out string[] rest)
         {
             if (token.startsWith("--") && flag.longName == body_)
                 return flag;
-            if (!token.startsWith("--") && flag.shortName.length > 0
-                && flag.shortName == body_)
+            if (!token.startsWith("--") && flag.shortName.length > 0 && flag.shortName == body_)
                 return flag;
         }
         return null;
@@ -366,9 +365,8 @@ private ptrdiff_t indexOfChar(string text, char needle)
 
 private string flagUsage(const Flag* flag)
 {
-    auto label = flag.shortName.length > 0
-        ? format("-%s, --%s", flag.shortName, flag.longName)
-        : format("    --%s", flag.longName);
+    auto label = flag.shortName.length > 0 ? format("-%s, --%s", flag.shortName,
+            flag.longName) : format("    --%s", flag.longName);
     if (flag.takesValue)
         label ~= flag.kind == FlagKind.list ? " strings" : " string";
     return label;
@@ -386,8 +384,8 @@ private string renderFlags(const Flag*[] flags)
     foreach (flag; flags)
     {
         const label = flagUsage(flag);
-        output ~= "  " ~ label ~ " ".replicate(width - label.length + 3)
-            ~ mutedStyle.render(flag.help) ~ "\n";
+        output ~= "  " ~ label ~ " ".replicate(
+                width - label.length + 3) ~ mutedStyle.render(flag.help) ~ "\n";
     }
     return output.data;
 }
@@ -398,14 +396,14 @@ void printHelp(Command command)
     auto output = appender!string;
     output ~= accentStyle.render("Usage:") ~ "\n";
     if (command.action !is null)
-        output ~= "  " ~ command.path()
-            ~ (command.argSpec.length > 0 ? " " ~ command.argSpec : "") ~ "\n";
+        output ~= "  " ~ command.path() ~ (command.argSpec.length > 0
+                ? " " ~ command.argSpec : "") ~ "\n";
     if (command.children.length > 0)
         output ~= "  " ~ command.path() ~ " [command]\n";
 
     if (command.aliases.length > 0)
-        output ~= "\n" ~ accentStyle.render("Aliases:") ~ "\n  "
-            ~ ([command.name] ~ command.aliases).join(", ") ~ "\n";
+        output ~= "\n" ~ accentStyle.render("Aliases:") ~ "\n  " ~ (
+                [command.name] ~ command.aliases).join(", ") ~ "\n";
 
     if (command.example.length > 0)
         output ~= "\n" ~ accentStyle.render("Examples:") ~ "\n" ~ command.example ~ "\n";
@@ -417,9 +415,8 @@ void printHelp(Command command)
         foreach (child; command.children)
             width = max(width, child.name.length);
         foreach (child; command.children)
-            output ~= "  " ~ tagStyle.render(child.name)
-                ~ " ".replicate(width - child.name.length + 1)
-                ~ mutedStyle.render(child.summary) ~ "\n";
+            output ~= "  " ~ tagStyle.render(child.name) ~ " ".replicate(
+                    width - child.name.length + 1) ~ mutedStyle.render(child.summary) ~ "\n";
     }
 
     if (command.flags.length > 0)
@@ -436,9 +433,8 @@ void printHelp(Command command)
         output ~= "\n" ~ accentStyle.render("Global Flags:") ~ "\n" ~ renderFlags(inherited);
 
     if (command.children.length > 0)
-        output ~= "\n" ~ mutedStyle.render("Use") ~ " \"" ~ command.path()
-            ~ " [command] --help\" " ~ mutedStyle.render("for more information about a command.")
-            ~ "\n";
+        output ~= "\n" ~ mutedStyle.render("Use") ~ " \"" ~ command.path() ~ " [command] --help\" "
+            ~ mutedStyle.render("for more information about a command.") ~ "\n";
 
     writeln(output.data);
 }
@@ -451,8 +447,7 @@ unittest
     string[] captured;
 
     auto root = new Command("geto", "test root");
-    root.withFlags(boolFlag(&verbose, "debug", "", "debug"),
-        listFlag(&tags, "tag", "t", "tags"));
+    root.withFlags(boolFlag(&verbose, "debug", "", "debug"), listFlag(&tags, "tag", "t", "tags"));
 
     auto child = new Command("install", "install something", "<url>");
     child.withAliases("i", "add");
@@ -460,7 +455,9 @@ unittest
     child.withAction((string[] args) { captured = args; });
     root.add(child);
 
-    execute(root, ["add", "-t", "cli,extra", "--provider=github", "github.com/a/b"]);
+    execute(root, [
+        "add", "-t", "cli,extra", "--provider=github", "github.com/a/b"
+    ]);
     assert(captured == ["github.com/a/b"]);
     assert(tags == ["cli", "extra"]);
     assert(name == "github");

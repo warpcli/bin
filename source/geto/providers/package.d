@@ -135,8 +135,8 @@ package void ownerAndRepo(string url, string label, out string owner, out string
 
     auto parts = urlPath(url).split('/');
     if (parts.length < 3)
-        throw new ProviderException("error parsing " ~ label ~ " URL " ~ url
-                ~ ", can't find owner and repo");
+        throw new ProviderException(
+                "error parsing " ~ label ~ " URL " ~ url ~ ", can't find owner and repo");
     owner = parts[1];
     repo = parts[2];
 }

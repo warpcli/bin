@@ -31,17 +31,14 @@ Command buildRoot(string versionText)
     buildVersion = versionText;
 
     auto root = new Command("geto", "Effortless binary manager");
-    root.withFlags(
-        boolFlag(&rootOpts.debugMode, "debug", "", "Enable debug mode"),
-        listFlag(&rootOpts.tags, "tag", "t",
+    root.withFlags(boolFlag(&rootOpts.debugMode, "debug", "",
+            "Enable debug mode"), listFlag(&rootOpts.tags, "tag", "t",
             `Tag context: which tier to act on (default "default", "all" for every binary)`),
-        textFlag(&rootOpts.configFile, "config-file", "",
-            "Path to geto manifest (env GETO_CONFIG_FILE)"),
-        textFlag(&rootOpts.stateFile, "state-file", "",
-            "Path to mutable state file (env GETO_STATE_FILE)"),
-        textFlag(&rootOpts.defaultPath, "default-path", "",
-            "Default install directory (env GETO_DEFAULT_PATH)"),
-    );
+            textFlag(&rootOpts.configFile, "config-file", "",
+                "Path to geto manifest (env GETO_CONFIG_FILE)"),
+            textFlag(&rootOpts.stateFile, "state-file", "",
+                "Path to mutable state file (env GETO_STATE_FILE)"), textFlag(&rootOpts.defaultPath,
+                "default-path", "", "Default install directory (env GETO_DEFAULT_PATH)"),);
     import std.functional : toDelegate;
 
     root.preRun = toDelegate(&loadEnvironment);
@@ -71,8 +68,7 @@ private void loadEnvironment()
     }
 
     activeTags = rootOpts.tags;
-    setPathOverrides(PathOverrides(rootOpts.configFile, rootOpts.stateFile,
-            rootOpts.defaultPath));
+    setPathOverrides(PathOverrides(rootOpts.configFile, rootOpts.stateFile, rootOpts.defaultPath));
 
     try
         checkAndLoad();

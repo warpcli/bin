@@ -75,23 +75,19 @@ struct ProgressBar
         if (filled > barW)
             filled = barW;
 
-        const bar = accentStyle.render("█".replicate(filled))
-            ~ mutedStyle.render("░".replicate(barW - filled));
+        const bar = accentStyle.render("█".replicate(filled)) ~ mutedStyle.render(
+                "░".replicate(barW - filled));
 
         const elapsed = (MonoTime.currTime - start).total!"msecs" / 1000.0;
         const speed = elapsed > 0 ? cast(long)(readSoFar / elapsed) : 0;
 
-        auto sizeText = total > 0
-            ? format("%s/%s", humanBytes(readSoFar), humanBytes(total))
-            : humanBytes(readSoFar);
+        auto sizeText = total > 0 ? format("%s/%s", humanBytes(readSoFar), humanBytes(total)) : humanBytes(
+                readSoFar);
         const stats = format("%-20s %9s/s", sizeText, humanBytes(speed));
 
-        const line = format("  %s %s  %s  %s  %s",
-            accentStyle.render("⤓"),
-            tagStyle.render(padRight(label, labelW)),
-            bar,
-            warnStyle.render(format("%3.0f%%", fraction * 100)),
-            mutedStyle.render(stats));
+        const line = format("  %s %s  %s  %s  %s", accentStyle.render("⤓"),
+                tagStyle.render(padRight(label, labelW)), bar,
+                warnStyle.render(format("%3.0f%%", fraction * 100)), mutedStyle.render(stats));
 
         // \r to the line start, draw, then clear to end-of-line.
         stderr.write("\r", line, "\x1b[K");

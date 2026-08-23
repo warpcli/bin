@@ -147,14 +147,14 @@ void sep()
 void stepHeader(string name, string detail)
 {
     writefln("%s %s  %s", accentStyle.render("▸"), accentStyle.render(name),
-        mutedStyle.render(detail));
+            mutedStyle.render(detail));
 }
 
 /// Prints a styled success line for a completed action.
 void stepDone(string verb, string name, string versionText)
 {
-    writefln("  %s %s %s %s", okStyle.render("✓"), mutedStyle.render(verb), name,
-        accentStyle.render(versionText));
+    writefln("  %s %s %s %s", okStyle.render("✓"), mutedStyle.render(verb),
+            name, accentStyle.render(versionText));
 }
 
 // ---------------------------------------------------------------------------

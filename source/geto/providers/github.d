@@ -64,8 +64,8 @@ final class GitHub : Provider
             throw new ProviderException("repository " ~ owner ~ "/" ~ repo
                     ~ " does not have releases");
         if (!response.ok)
-            throw new ProviderException("GitHub returned " ~ response.status.stringOf
-                    ~ " for " ~ endpoint);
+            throw new ProviderException(
+                    "GitHub returned " ~ response.status.stringOf ~ " for " ~ endpoint);
 
         auto release = parseJSON(response.text);
         Asset[] candidates;

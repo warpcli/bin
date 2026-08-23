@@ -144,8 +144,8 @@ Provider newHashiCorp(string url)
 {
     auto parts = urlPath(url).split('/');
     if (parts.length < 2 || parts[1].length == 0)
-        throw new ProviderException("error parsing HashiCorp releases URL " ~ url
-                ~ ", can't find repo");
+        throw new ProviderException(
+                "error parsing HashiCorp releases URL " ~ url ~ ", can't find repo");
     const tag = parts.length >= 3 ? parts[2] : "";
     return new HashiCorp(parts[1], tag);
 }

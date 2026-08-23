@@ -60,8 +60,7 @@ final class GoInstall : Provider
         try
             data = cast(ubyte[]) read(binaryPath);
         catch (Exception failure)
-            throw new ProviderException("failed to open path '" ~ binaryPath ~ "': "
-                    ~ failure.msg);
+            throw new ProviderException("failed to open path '" ~ binaryPath ~ "': " ~ failure.msg);
 
         File result;
         result.data = data;

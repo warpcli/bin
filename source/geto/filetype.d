@@ -31,31 +31,23 @@ private immutable bool[string] otherExtensions;
 shared static this()
 {
     FileKind[string] specific = [
-        "gz": FileKind.gz,
-        "tar": FileKind.tar,
-        "xz": FileKind.xz,
-        "bz2": FileKind.bz2,
-        "zst": FileKind.zst,
-        "zip": FileKind.zip,
-        "exe": FileKind.exe,
-        "elf": FileKind.elf,
-        "deb": FileKind.deb,
-        "rpm": FileKind.rpm,
-        "msi": FileKind.msi,
-        "asc": FileKind.asc,
+        "gz": FileKind.gz, "tar": FileKind.tar, "xz": FileKind.xz,
+        "bz2": FileKind.bz2, "zst": FileKind.zst, "zip": FileKind.zip,
+        "exe": FileKind.exe, "elf": FileKind.elf, "deb": FileKind.deb,
+        "rpm": FileKind.rpm, "msi": FileKind.msi, "asc": FileKind.asc,
     ];
     specificExtensions = cast(immutable) specific;
 
     bool[string] others;
     foreach (name; [
-            "3gp", "7z", "aac", "aiff", "amr", "ar", "avi", "bmp", "cab", "cr2",
-            "crx", "dcm", "dex", "dey", "doc", "docx", "dwg", "eot", "epub",
-            "flac", "flv", "gif", "heif", "ico", "iso", "jp2", "jpg", "jxr",
-            "lz", "m4a", "m4v", "macho", "mid", "mkv", "mov", "mp3", "mp4",
-            "mpg", "nes", "ogg", "otf", "pdf", "png", "ppt", "pptx", "ps",
-            "psd", "rar", "rtf", "sqlite", "swf", "tif", "ttf", "wasm", "wav",
-            "webm", "webp", "wmv", "woff", "woff2", "xls", "xlsx", "z"
-        ])
+        "3gp", "7z", "aac", "aiff", "amr", "ar", "avi", "bmp", "cab", "cr2",
+        "crx", "dcm", "dex", "dey", "doc", "docx", "dwg", "eot", "epub",
+        "flac", "flv", "gif", "heif", "ico", "iso", "jp2", "jpg", "jxr", "lz",
+        "m4a", "m4v", "macho", "mid", "mkv", "mov", "mp3", "mp4", "mpg",
+        "nes", "ogg", "otf", "pdf", "png", "ppt", "pptx", "ps", "psd", "rar",
+        "rtf", "sqlite", "swf", "tif", "ttf", "wasm", "wav", "webm", "webp",
+        "wmv", "woff", "woff2", "xls", "xlsx", "z"
+    ])
         others[name] = true;
     otherExtensions = cast(immutable) others;
 }
@@ -88,9 +80,8 @@ FileKind detect(const(ubyte)[] data)
         return FileKind.bz2;
     if (startsWith(data, [0x28, 0xB5, 0x2F, 0xFD]))
         return FileKind.zst;
-    if (data.length > 3 && data[0] == 'P' && data[1] == 'K'
-        && (data[2] == 3 || data[2] == 5 || data[2] == 7)
-        && (data[3] == 4 || data[3] == 6 || data[3] == 8))
+    if (data.length > 3 && data[0] == 'P' && data[1] == 'K' && (data[2] == 3
+            || data[2] == 5 || data[2] == 7) && (data[3] == 4 || data[3] == 6 || data[3] == 8))
         return FileKind.zip;
     if (data.length > 261 && data[257 .. 262] == cast(const(ubyte)[]) "ustar")
         return FileKind.tar;

@@ -75,8 +75,8 @@ private ushort readU16(const(ubyte)[] data, size_t offset)
 
 private uint readU32(const(ubyte)[] data, size_t offset)
 {
-    return cast(uint)(data[offset] | (data[offset + 1] << 8)
-            | (data[offset + 2] << 16) | (cast(uint) data[offset + 3] << 24));
+    return cast(uint)(data[offset] | (data[offset + 1] << 8) | (
+            data[offset + 2] << 16) | (cast(uint) data[offset + 3] << 24));
 }
 
 private ulong readU64(const(ubyte)[] data, size_t offset)
@@ -357,7 +357,7 @@ private ElfImage loadImage(string path)
 string[] importedLibraries(const(ubyte)[] data)
 {
     if (data.length < 64 || data[0 .. 4] != cast(const(ubyte)[]) "\x7fELF"
-        || data[4] != 2 || data[5] != 1)
+            || data[4] != 2 || data[5] != 1)
         return null;
     try
     {
@@ -585,7 +585,8 @@ private void setRunpathGrow(string path, string rpath)
 unittest
 {
     assert(!looksLikeElf([0x00, 0x01, 0x02, 0x03]));
-    assert(looksLikeElf(cast(const(ubyte)[]) "\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"));
+    assert(looksLikeElf(cast(const(
+            ubyte)[]) "\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"));
 
     ubyte[0x80] pe;
     pe[0] = 'M';

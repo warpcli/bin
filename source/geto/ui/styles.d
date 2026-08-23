@@ -267,44 +267,37 @@ string listTable(ListRow[] rows, int width)
     const repoW = flex - nameW;
 
     auto captured = rows;
-    auto table = newStaticTable()
-        .border(roundedBorder())
-        .borderStyle(borderStyle)
-        .totalWidth(width)
-        .headers("BINARY", "VERSION", "TAGS", "STATUS", "REPO")
-        .styleFunc((int row, int column) {
-            auto style = newStyle().padding(0, 1);
-            if (row == headerRow)
-                return style.bold().foreground(colorPrimary);
-            switch (column)
-            {
-            case 1:
-                if (row >= 0 && row < cast(int) captured.length && captured[row].pinned)
-                    return style.foreground(colorWarn);
-                return style;
-            case 2:
-                return style.foreground(colorTag);
-            case 3:
-                if (row >= 0 && row < cast(int) captured.length && !captured[row].present)
-                    return style.foreground(colorErr);
-                return style.foreground(colorOk);
-            case 4:
-                return style.foreground(colorMuted);
-            default:
-                return style;
-            }
-        });
+    auto table = newStaticTable().border(roundedBorder()).borderStyle(borderStyle)
+        .totalWidth(width).headers("BINARY", "VERSION", "TAGS", "STATUS",
+            "REPO").styleFunc((int row, int column) {
+        auto style = newStyle().padding(0, 1);
+        if (row == headerRow)
+            return style.bold().foreground(colorPrimary);
+        switch (column)
+        {
+        case 1:
+            if (row >= 0 && row < cast(int) captured.length && captured[row].pinned)
+                return style.foreground(colorWarn);
+            return style;
+        case 2:
+            return style.foreground(colorTag);
+        case 3:
+            if (row >= 0 && row < cast(int) captured.length && !captured[row].present)
+                return style.foreground(colorErr);
+            return style.foreground(colorOk);
+        case 4:
+            return style.foreground(colorMuted);
+        default:
+            return style;
+        }
+    });
 
     foreach (row; rows)
     {
         auto versionText = row.pinned ? "★ " ~ row.versionText : row.versionText;
-        table.row(
-            clip(row.path, nameW),
-            clip(versionText, verW),
-            clip(row.tags.join(","), tagW),
-            row.present ? "● ok" : "● missing",
-            clip(repoShort(row.url), repoW),
-        );
+        table.row(clip(row.path, nameW), clip(versionText, verW),
+                clip(row.tags.join(","), tagW), row.present
+                ? "● ok" : "● missing", clip(repoShort(row.url), repoW),);
     }
     return table.toString();
 }
