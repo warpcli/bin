@@ -6,7 +6,7 @@
 
 Effortless binary manager. Install, update, and organize standalone binaries pulled straight from release pages — no package manager, no build step.
 
-`geto` downloads release assets from GitHub, GitLab, Codeberg, HashiCorp releases, Docker images, or `go install`, picks the right artifact for your OS/arch, unpacks it if needed, and keeps track of what's installed so you can update everything in one command.
+`geto` downloads release assets from GitHub, GitLab, Codeberg, HashiCorp releases, or `go install`, picks the right artifact for your OS/arch, unpacks it if needed, and keeps track of what's installed so you can update everything in one command.
 
 > A hard fork of [marcosnils/bin](https://github.com/marcosnils/bin) with a single tagged config, repo descriptions, and a full TUI.
 
@@ -14,10 +14,7 @@ Effortless binary manager. Install, update, and organize standalone binaries pul
 
 ## Install
 
-```sh
-go install github.com/bresilla/geto/src@latest
-```
-
+Grab a binary from the [releases page](https://github.com/bresilla/geto/releases),
 or build from source:
 
 ```sh
@@ -25,6 +22,10 @@ git clone https://github.com/bresilla/geto
 cd geto
 make build      # produces ./geto
 ```
+
+Building needs [LDC](https://github.com/ldc-developers/ldc) and
+[dub](https://dub.pm), plus the OpenSSL, xz, bzip2, zstd and zlib development
+headers. The flake's dev shell (`nix develop`) provides all of them.
 
 On first run, `geto` picks a download directory from your `PATH` (e.g. `~/.local/bin`) and creates its config.
 
@@ -164,7 +165,6 @@ writes `/var/lib/geto/config.state.json`, and installs into `/usr/local/bin`.
 | GitLab | `geto install gitlab.com/gitlab-org/cli` |
 | Codeberg | `geto install codeberg.org/lukeflo/bibiman` |
 | HashiCorp | `geto install releases.hashicorp.com/terraform` |
-| Docker | `geto install docker://hashicorp/terraform` |
 | `go install` | `geto install goinstall://github.com/x/y` |
 
 Asset selection scores candidates by OS/arch and filters out non-installable files (`.sig`, `.sha256`, `.sbom`, `.deb`, …). Your pick is remembered, so updates don't re-prompt unless the release's file layout changes (use `update -r` to force a re-pick).
@@ -267,15 +267,40 @@ Set as needed in your environment:
 
 ## Development
 
+`geto` is written in [D](https://dlang.org) and built with dub.
+
 ```sh
-make build      # build ./geto (version-stamped)
+make build      # build ./geto
 make install    # install to $PREFIX/bin (default ~/.local/bin)
 make run ARGS='list -t all'
-make test       # go test ./...
-make verify     # fmt-check + vet + test
+make test       # dub test
+make verify     # fmt-check + test
+make static     # fully static build (needs musl static libs — see below)
 make release TYPE=minor   # cut a release via git-rel
 make help       # list all targets
 ```
+
+### Layout
+
+| Path | What lives there |
+| --- | --- |
+| `source/geto/config.d` | manifest + state files, migrations, tag handling |
+| `source/geto/assets.d` | release-asset scoring, filtering and unpacking |
+| `source/geto/providers/` | GitHub, GitLab, Codeberg, HashiCorp, `go install` |
+| `source/geto/ai/` | naive Bayes + neural net used to break selection ties |
+| `source/geto/elf.d` | ELF parsing and interpreter/RUNPATH patching |
+| `source/geto/ui/` | palette, table, progress bar and prompts |
+| `source/geto/cmd/` | CLI commands and the interactive TUI |
+
+The TUI is built on [mochafizz](https://github.com/bresilla/mochafizz).
+
+### Static builds
+
+Release binaries are linked fully static against musl, which needs static
+archives for OpenSSL and the compression libraries. Those are only packaged for
+musl, so `make static` and the release workflow run inside Alpine. See
+`scripts/patch-requests-static.sh` for the one upstream gap that has to be
+patched first.
 
 ## License & credits
 

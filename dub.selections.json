@@ -1,0 +1,12 @@
+{
+	"fileVersion": 1,
+	"versions": {
+		"automem": "0.6.11",
+		"cachetools": "0.4.2",
+		"mochafizz": {"version":"a5ad7c149bfa7a5f9e98d44e1d79ab625ff6b289","repository":"git+https://github.com/bresilla/mochafizz"},
+		"requests": "2.2.1",
+		"squiz-box": "0.3.0",
+		"test_allocator": "0.3.4",
+		"unit-threaded": "2.2.4"
+	}
+}

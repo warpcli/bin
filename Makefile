@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 
 PROJECT_NAME := $(shell if [ -f PROJECT ]; then sed -n '/^[[:space:]]*[^#\[[:space:]]/p' PROJECT | head -1 | tr -d '[:space:]'; else sed -n 's/^[[:space:]]*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' dub.json | head -1; fi)
-PROJECT_VERSION := $(shell if [ -f PROJECT ]; then sed -n '/^[[:space:]]*[^#\[[:space:]]/p' PROJECT | sed -n '2p' | tr -d '[:space:]'; else sed -n 's/^[[:space:]]*enum buildVersion[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' source/app.d | head -1; fi)
+PROJECT_VERSION := $(shell if [ -f PROJECT ]; then sed -n '/^[[:space:]]*[^#\[[:space:]]/p' PROJECT | sed -n '2p' | tr -d '[:space:]'; else cat VERSION | tr -d '[:space:]'; fi)
 ifeq ($(PROJECT_NAME),)
     $(error Error: could not determine project name from PROJECT or dub.json)
 endif
@@ -64,6 +64,8 @@ check: test
 # the same packages installed (openssl-libs-static xz-static bzip2-static
 # zstd-static zlib-static).
 static:
+	@$(DUB) upgrade --missing-only >/dev/null 2>&1 || true
+	@./scripts/patch-requests-static.sh
 	@$(DUB) build --compiler=$(DC) --build=$(BUILD_TYPE) --config=static
 	@$(MAKE) --no-print-directory verify-static
 

@@ -1,11 +1,13 @@
 module app;
 
 import core.stdc.stdlib : exit;
+import std.string : strip;
 
 import geto.cmd.root : run;
 
-/// Overridden at build time via `-version=...`; kept simple for local builds.
-enum buildVersion = "0.4.0-d";
+/// Single source of truth for the release version; the Makefile and the
+/// release workflow read the same file.
+enum buildVersion = import("VERSION").strip;
 
 void main(string[] args)
 {

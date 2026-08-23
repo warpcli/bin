@@ -2,12 +2,21 @@
   "name": "geto",
   "description": "Effortless binary manager",
   "license": "MIT",
-  "authors": ["Trim Bresilla"],
+  "authors": [
+    "Trim Bresilla"
+  ],
   "targetType": "executable",
   "targetName": "geto",
-  "sourcePaths": ["source"],
-  "importPaths": ["source"],
-  "stringImportPaths": ["source/geto/ai/seed"],
+  "sourcePaths": [
+    "source"
+  ],
+  "importPaths": [
+    "source"
+  ],
+  "stringImportPaths": [
+    "source/geto/ai/seed",
+    "."
+  ],
   "dependencies": {
     "mochafizz": {
       "repository": "git+https://github.com/bresilla/mochafizz",
@@ -25,17 +34,23 @@
     {
       "name": "static",
       "targetType": "executable",
-      "comment": "Fully static build. Needs musl static archives for openssl, lzma, bzip2 and zstd — see `make static` and the Alpine release job.",
+      "comment": "Fully static build. Needs musl static archives for openssl, lzma, bzip2 and zstd \u2014 see `make static` and the Alpine release job.",
       "mainSourceFile": "source/app.d",
       "subConfigurations": {
         "requests": "staticssl"
       },
-      "dflags": ["-static"]
+      "dflags": [
+        "-static"
+      ]
     }
   ],
   "buildTypes": {
     "release": {
-      "buildOptions": ["releaseMode", "optimize", "inline"]
+      "buildOptions": [
+        "releaseMode",
+        "optimize",
+        "inline"
+      ]
     }
   }
 }

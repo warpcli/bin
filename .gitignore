@@ -6,9 +6,9 @@
 *.a
 *.lst
 
-# dub
+# dub (dub.selections.json is tracked: this is an application, so exact
+# dependency versions belong in the repo)
 /.dub/
-/dub.selections.json
 
 # nix / direnv
 /result

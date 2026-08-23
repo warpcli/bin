@@ -14,63 +14,85 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    runs-on: ubuntu-latest
+  # Release binaries are built inside Alpine so they link against musl. Unlike
+  # the Go build, a fully static D binary needs static archives for OpenSSL and
+  # the compression libraries, and those only exist for musl here — a glibc
+  # static link would still drag in the dynamic loader.
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    container: alpine:3.21
     steps:
+      - name: Install toolchain
+        run: |
+          apk add --no-cache \
+            ldc dub gcc musl-dev git tar gzip coreutils binutils \
+            openssl-dev openssl-libs-static \
+            xz-dev xz-static \
+            bzip2-dev bzip2-static \
+            zstd-dev zstd-static \
+            zlib-dev zlib-static
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{ github.event.inputs.tag || github.ref }}
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-          check-latest: true
-
-      - name: Build release binaries
+      - name: Build static binary
         run: |
           set -euo pipefail
-          VERSION="${{ github.event.inputs.tag || github.ref_name }}"
-          COMMIT="$(git rev-parse --short HEAD)"
-          DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          LDFLAGS="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE} -X main.builtBy=github-actions"
+          git config --global --add safe.directory "$PWD"
+          dub upgrade --missing-only
+          ./scripts/patch-requests-static.sh
+          dub build --compiler=ldc2 --build=release --config=static
 
+      - name: Verify it is really static
+        run: |
+          set -euo pipefail
+          if readelf -d geto | grep -q NEEDED; then
+            echo "::error::${{ matrix.arch }} is dynamically linked:"
+            readelf -d geto | grep NEEDED
+            exit 1
+          fi
+          if readelf -l geto | grep -q INTERP; then
+            echo "::error::${{ matrix.arch }} requests a dynamic loader"
+            exit 1
+          fi
+          echo "verified static: no NEEDED entries, no INTERP segment"
+          ./geto --version
+
+      - name: Package
+        run: |
+          set -euo pipefail
           mkdir -p dist
-          targets="linux/amd64 linux/arm64 windows/amd64"
-          for t in $targets; do
-            # CGO_ENABLED=0 is what makes these binaries fully static: with cgo
-            # the net package links the host resolver and the result depends on
-            # the builder's libc. Verified below rather than assumed.
-            export GOOS="${t%/*}" GOARCH="${t#*/}" CGO_ENABLED=0
-            out="bin"; [ "$GOOS" = "windows" ] && out="bin.exe"
-            echo "building $GOOS/$GOARCH"
-            go build -trimpath -ldflags "$LDFLAGS" -o "$out" ./src
+          tar -czf "dist/geto_linux_${{ matrix.arch }}.tar.gz" geto
 
-            if [ "$GOOS" = "linux" ]; then
-              if readelf -d "$out" | grep -q NEEDED; then
-                echo "::error::$GOOS/$GOARCH is dynamically linked:"
-                readelf -d "$out" | grep NEEDED
-                exit 1
-              fi
-              if readelf -l "$out" | grep -q INTERP; then
-                echo "::error::$GOOS/$GOARCH requests a dynamic loader"
-                exit 1
-              fi
-              echo "  verified static: no NEEDED entries, no INTERP segment"
-            fi
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: geto_linux_${{ matrix.arch }}
+          path: dist/*
 
-            pkg="bin_${GOOS}_${GOARCH}"
-            if [ "$GOOS" = "windows" ]; then
-              zip -q "dist/${pkg}.zip" "$out"
-            else
-              tar -czf "dist/${pkg}.tar.gz" "$out"
-            fi
-            rm -f "$out"
-          done
-          ( cd dist && sha256sum * > SHA256SUMS )
-          ls -la dist
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS && ls -la
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
