@@ -325,6 +325,25 @@ private immutable string[][] archAliasGroups = [
     ["loong64", "loongarch64"],
 ];
 
+/// Checksum manifests are regularly published with no extension at all
+/// (SHA256SUMS, sha512sums, MD5SUMS), so the extension table never sees them
+/// and they read as extensionless raw binaries.
+private bool isChecksumManifest(string lower)
+{
+    import std.path : stripExtension;
+
+    const base = lower.stripExtension;
+    if (base.endsWith("checksum") || base.endsWith("checksums"))
+        return true;
+    if (!base.endsWith("sum") && !base.endsWith("sums"))
+        return false;
+    // Require a digest name too, so a binary that merely ends in "sum" stays.
+    foreach (digest; ["sha", "md5", "blake2", "blake3", "b2", "b3"])
+        if (base.canFind(digest))
+            return true;
+    return false;
+}
+
 /// Whether an asset could be something geto can install. Keeps supported
 /// archives, OS-appropriate single files, and raw binaries (often extensionless
 /// but carrying dots from a version), rejecting only known non-binary types.
@@ -334,6 +353,8 @@ bool isUsableAsset(string name)
     foreach (suffix; ignoredNameSuffixes)
         if (lower.endsWith(suffix))
             return false;
+    if (isChecksumManifest(lower))
+        return false;
 
     foreach (suffix; installableSuffixes)
         if (lower.endsWith(suffix))
@@ -1469,6 +1490,21 @@ version (unittest)
         ]);
     }
 
+    private auto linuxArm64()
+    {
+        return fakeResolver(["linux"], [
+            "arm64", "aarch64", "arm_64", "arm-64", "armv8"
+        ], ["AppImage"]);
+    }
+
+    /// What geto's own release publishes, so its naming stays self-installable.
+    private Asset[] getoAssets()
+    {
+        return assetsNamed([
+            "SHA256SUMS", "geto_linux_amd64.tar.gz", "geto_linux_arm64.tar.gz",
+        ]);
+    }
+
     private auto windowsAmd64()
     {
         return fakeResolver(["windows", "win"], ["amd64", "x86_64", "x64", "64"], [
@@ -1535,10 +1571,26 @@ unittest
         "codex-x86_64-unknown-linux-musl.sigstore",
         "openai_codex_cli_bin-0.140.0-py3-none-manylinux_2_17_x86_64.whl",
         "checksums.txt", "codex.tar.gz.sha256", "release.sbom.json", "pkg.deb",
-        "tool-update",
+        "tool-update", "SHA256SUMS", "sha512sums", "MD5SUMS", "checksums",
+        "blake3sums",
     ])
         assert(!isUsableAsset(name), name);
 
+    // --- geto installs itself ------------------------------------------------
+    // The release publishes one archive per architecture next to a checksum
+    // file. Each host has to land on its own archive with nothing left to ask
+    // the user about, or `geto install termworks/geto` would stop to prompt.
+    setResolver(linuxAmd64());
+    auto ownAmd64 = narrowToPlatform(filterUsableAssets(getoAssets()));
+    assert(ownAmd64.length == 1 && ownAmd64[0].name == "geto_linux_amd64.tar.gz",
+            fingerprint(ownAmd64).join(", "));
+
+    setResolver(linuxArm64());
+    auto ownArm64 = narrowToPlatform(filterUsableAssets(getoAssets()));
+    assert(ownArm64.length == 1 && ownArm64[0].name == "geto_linux_arm64.tar.gz",
+            fingerprint(ownArm64).join(", "));
+
+    setResolver(linuxAmd64());
     assert(isSupportedExt("tool.tar.gz"));
     assert(!isSupportedExt("tool.deb"));
     assert(!isSupportedExt("tool.png"));
