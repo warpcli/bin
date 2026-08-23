@@ -6,7 +6,7 @@ import std.path : baseName, buildPath, dirName, globMatch;
 import std.process : environment;
 import std.string : startsWith, strip;
 
-import geto.elf : importedLibraries, looksLikeElf;
+import geto.elf : ElfReader;
 import geto.log;
 
 /// Shared libraries the binary needs that cannot be resolved on this host.
@@ -21,15 +21,13 @@ string[] missingLibs(string path)
     if (!path.exists)
         return null;
 
-    ubyte[] data;
-    try
-        data = cast(ubyte[]) read(path);
-    catch (Exception)
-        return null;
-    if (!looksLikeElf(data))
+    // One reader answers all three queries; each reads a few KB rather than
+    // the whole binary.
+    auto reader = ElfReader.open(path);
+    if (reader is null)
         return null;
 
-    auto needed = importedLibraries(data);
+    auto needed = reader.needed();
     if (needed.length == 0)
         return null;
 
@@ -40,28 +38,14 @@ string[] missingLibs(string path)
         return text.replace("${ORIGIN}", origin).replace("$ORIGIN", origin);
     }
 
-    string[] splitPaths(string text)
-    {
-        string[] result;
-        foreach (piece; text.split(':'))
+    string[] dirs;
+    foreach (entry; reader.runpathEntries())
+        foreach (piece; entry.split(':'))
         {
             const trimmed = piece.strip;
             if (trimmed.length > 0)
-                result ~= expand(trimmed);
+                dirs ~= expand(trimmed);
         }
-        return result;
-    }
-
-    auto runpath = dynamicStringsOf(data, dtRunpath);
-    auto rpath = dynamicStringsOf(data, dtRpath);
-
-    string[] dirs;
-    // DT_RPATH applies only when DT_RUNPATH is absent.
-    if (runpath.length == 0)
-        foreach (entry; rpath)
-            dirs ~= splitPaths(entry);
-    foreach (entry; runpath)
-        dirs ~= splitPaths(entry);
     dirs ~= systemLibDirs();
 
     string[] missing;
@@ -69,22 +53,6 @@ string[] missingLibs(string path)
         if (!libFound(lib, dirs))
             missing ~= lib;
     return missing;
-}
-
-private enum ulong dtRpath = 15;
-private enum ulong dtRunpath = 29;
-
-private string[] dynamicStringsOf(const(ubyte)[] data, ulong tag)
-{
-    import geto.elf : ElfImage;
-
-    try
-    {
-        auto image = ElfImage.fromBuffer(cast(ubyte[]) data.dup);
-        return image.dynamicStrings(tag);
-    }
-    catch (Exception)
-        return null;
 }
 
 /// Host library search directories: environment, ld.so.conf, then defaults.

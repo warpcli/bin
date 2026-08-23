@@ -908,10 +908,12 @@ private final class TuiModel : Model
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Reads on-disk metadata without touching the network.
+/// Reads on-disk metadata without touching the network. Only the ELF header,
+/// program headers and interpreter string are read, so refreshing a long list
+/// does not pull every managed binary through the page cache.
 private void localMeta(string path, out long size, out string arch, out string libc)
 {
-    import geto.elf : interpreter, looksLikeElf;
+    import geto.elf : ElfReader;
 
     if (!path.exists)
         return;
@@ -920,29 +922,20 @@ private void localMeta(string path, out long size, out string arch, out string l
     catch (Exception)
         return;
 
-    ubyte[] data;
-    try
-        data = cast(ubyte[]) read(path);
-    catch (Exception)
-        return;
-    if (!looksLikeElf(data) || data.length < 20)
+    auto reader = ElfReader.open(path);
+    if (reader is null)
         return;
 
-    arch = elfArch(cast(ushort)(data[18] | (data[19] << 8)));
-    libc = "static";
-    try
-    {
-        const interp = interpreter(path);
-        if (interp.canFind("musl"))
-            libc = "musl";
-        else if (interp.canFind("ld-linux") || interp.canFind("/ld-"))
-            libc = "glibc";
-        else
-            libc = "dynamic";
-    }
-    catch (Exception)
-    {
-    }
+    arch = elfArch(reader.machine());
+    const interp = reader.interpreter();
+    if (interp.length == 0)
+        libc = "static";
+    else if (interp.canFind("musl"))
+        libc = "musl";
+    else if (interp.canFind("ld-linux") || interp.canFind("/ld-"))
+        libc = "glibc";
+    else
+        libc = "dynamic";
 }
 
 /// Maps an ELF `e_machine` value to the architecture names geto uses.

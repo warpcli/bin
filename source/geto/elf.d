@@ -1,6 +1,7 @@
 module geto.elf;
 
-import std.file : getAttributes, read, setAttributes, write;
+import std.file : exists, getAttributes, read, setAttributes, write;
+import std.stdio : File;
 import std.string : fromStringz;
 
 /// Raised when an ELF operation cannot be completed.
@@ -341,6 +342,197 @@ private string readCString(const(ubyte)[] data, size_t offset)
     return cast(string) data[offset .. end].idup;
 }
 
+// ---------------------------------------------------------------------------
+// Targeted reading
+// ---------------------------------------------------------------------------
+
+/// Reads only the regions of an ELF file it is asked about. Metadata queries
+/// then cost a few kilobytes instead of the whole binary, which matters when
+/// the TUI inspects every managed binary on each refresh.
+final class ElfReader
+{
+    private File file;
+    private ushort machineValue;
+    private ulong phoff;
+    private size_t phentsize;
+    private size_t phnum;
+    private ubyte[] programHeaders;
+
+    private this()
+    {
+    }
+
+    /// Opens `path`, or returns null when it is not a 64-bit little-endian ELF.
+    static ElfReader open(string path)
+    {
+        auto reader = new ElfReader;
+        try
+        {
+            reader.file = File(path, "rb");
+            ubyte[64] header;
+            auto got = reader.file.rawRead(header[]);
+            if (got.length < 64 || got[0 .. 4] != cast(const(ubyte)[]) "\x7fELF"
+                    || got[4] != 2 || got[5] != 1)
+                return null;
+
+            reader.machineValue = readU16(got[], 18);
+            reader.phoff = readU64(got[], 0x20);
+            reader.phentsize = readU16(got[], 0x36);
+            reader.phnum = readU16(got[], 0x38);
+            if (reader.phoff == 0 || reader.phentsize < 56 || reader.phnum == 0)
+                return null;
+            if (reader.phnum > 4096)
+                return null;
+
+            reader.programHeaders = reader.readAt(reader.phoff, reader.phentsize * reader.phnum);
+            if (reader.programHeaders.length < reader.phentsize * reader.phnum)
+                return null;
+        }
+        catch (Exception)
+            return null;
+        return reader;
+    }
+
+    private ubyte[] readAt(ulong offset, size_t length)
+    {
+        if (length == 0 || length > 64 * 1024 * 1024)
+            return null;
+        try
+        {
+            file.seek(cast(long) offset);
+            auto buffer = new ubyte[length];
+            return file.rawRead(buffer);
+        }
+        catch (Exception)
+            return null;
+    }
+
+    private uint progU32(size_t index, size_t field) const
+    {
+        return readU32(programHeaders, index * phentsize + field);
+    }
+
+    private ulong progU64(size_t index, size_t field) const
+    {
+        return readU64(programHeaders, index * phentsize + field);
+    }
+
+    private long findProg(uint type) const
+    {
+        foreach (i; 0 .. phnum)
+            if (progU32(i, pType) == type)
+                return cast(long) i;
+        return -1;
+    }
+
+    private bool vaddrToOff(ulong vaddr, out ulong offset) const
+    {
+        foreach (i; 0 .. phnum)
+        {
+            if (progU32(i, pType) != ptLoad)
+                continue;
+            const base = progU64(i, pVaddr);
+            const size = progU64(i, pFilesz);
+            if (vaddr >= base && vaddr < base + size)
+            {
+                offset = progU64(i, pOffset) + (vaddr - base);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The `e_machine` value.
+    ushort machine() const
+    {
+        return machineValue;
+    }
+
+    /// The PT_INTERP path, or "" for a static binary.
+    string interpreter()
+    {
+        const index = findProg(ptInterp);
+        if (index < 0)
+            return "";
+        const size = cast(size_t) progU64(index, pFilesz);
+        if (size == 0 || size > 4096)
+            return "";
+        auto data = readAt(progU64(index, pOffset), size);
+        return data.length == 0 ? "" : readCString(data, 0);
+    }
+
+    /// The dynamic-section entries, paired with the string table they index.
+    private bool dynamic(out ubyte[] entries, out ubyte[] strings, out ulong stringsSize)
+    {
+        const index = findProg(ptDynamic);
+        if (index < 0)
+            return false;
+        entries = readAt(progU64(index, pOffset), cast(size_t) progU64(index, pFilesz));
+        if (entries.length < dynEntSize)
+            return false;
+
+        ulong strtabVaddr, strsz;
+        bool haveStrtab, haveStrsz;
+        for (size_t k = 0; (k + 1) * dynEntSize <= entries.length; k++)
+        {
+            const tag = readU64(entries, k * dynEntSize);
+            const value = readU64(entries, k * dynEntSize + 8);
+            if (tag == dtStrtab)
+            {
+                strtabVaddr = value;
+                haveStrtab = true;
+            }
+            else if (tag == dtStrsz)
+            {
+                strsz = value;
+                haveStrsz = true;
+            }
+        }
+        if (!haveStrtab || !haveStrsz || strsz == 0)
+            return false;
+
+        ulong strOff;
+        if (!vaddrToOff(strtabVaddr, strOff))
+            return false;
+        strings = readAt(strOff, cast(size_t) strsz);
+        stringsSize = strings.length;
+        return strings.length > 0;
+    }
+
+    private string[] dynamicStrings(ulong tag)
+    {
+        ubyte[] entries, strings;
+        ulong stringsSize;
+        if (!dynamic(entries, strings, stringsSize))
+            return null;
+
+        string[] result;
+        for (size_t k = 0; (k + 1) * dynEntSize <= entries.length; k++)
+        {
+            if (readU64(entries, k * dynEntSize) != tag)
+                continue;
+            const nameOff = readU64(entries, k * dynEntSize + 8);
+            if (nameOff >= stringsSize)
+                continue;
+            result ~= readCString(strings, cast(size_t) nameOff);
+        }
+        return result;
+    }
+
+    /// Shared libraries declared through DT_NEEDED.
+    string[] needed()
+    {
+        return dynamicStrings(dtNeeded);
+    }
+
+    /// DT_RUNPATH entries, falling back to DT_RPATH.
+    string[] runpathEntries()
+    {
+        auto entries = dynamicStrings(dtRunpath);
+        return entries.length > 0 ? entries : dynamicStrings(dtRpath);
+    }
+}
+
 private ElfImage loadImage(string path)
 {
     auto buffer = cast(ubyte[]) read(path);
@@ -371,25 +563,20 @@ string[] importedLibraries(const(ubyte)[] data)
 /// The binary's PT_INTERP path.
 string interpreter(string path)
 {
-    auto image = loadImage(path);
-    const index = image.findProg(ptInterp);
-    if (index < 0)
+    auto reader = ElfReader.open(path);
+    if (reader is null)
+        throw new ElfException("not a 64-bit little-endian ELF file");
+    const interp = reader.interpreter();
+    if (interp.length == 0)
         throw new ElfException("no interpreter");
-    const offset = cast(size_t) image.progU64(index, pOffset);
-    const size = cast(size_t) image.progU64(index, pFilesz);
-    if (offset + size > image.data.length)
-        throw new ElfException("malformed PT_INTERP segment");
-    return readCString(image.data, offset);
+    return interp;
 }
 
 /// The binary's DT_RUNPATH entries, falling back to DT_RPATH.
 string[] runpath(string path)
 {
-    auto image = loadImage(path);
-    auto entries = image.dynamicStrings(dtRunpath);
-    if (entries.length > 0)
-        return entries;
-    return image.dynamicStrings(dtRpath);
+    auto reader = ElfReader.open(path);
+    return reader is null ? null : reader.runpathEntries();
 }
 
 // ---------------------------------------------------------------------------
@@ -594,4 +781,27 @@ unittest
     writeU32(pe[], 0x3C, 0x40);
     pe[0x40 .. 0x44] = cast(const(ubyte)[]) "PE\0\0";
     assert(looksLikePe(pe[]));
+}
+
+unittest
+{
+    import std.algorithm : canFind;
+    import std.file : thisExePath;
+
+    // The test runner is itself a 64-bit ELF, so it makes a convenient fixture
+    // and proves the targeted reader agrees with a full parse.
+    auto reader = ElfReader.open(thisExePath);
+    assert(reader !is null);
+    assert(reader.machine() != 0);
+
+    auto whole = cast(ubyte[]) read(thisExePath);
+    assert(looksLikeElf(whole));
+    assert(reader.needed() == importedLibraries(whole));
+
+    const interp = reader.interpreter();
+    if (interp.length > 0)
+        assert(interp[0] == '/', interp);
+
+    // A non-ELF file is rejected rather than throwing.
+    assert(ElfReader.open("/etc/hostname") is null || !"/etc/hostname".exists);
 }
