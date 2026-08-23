@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release'
-        required: true
+        description: 'Tag to release. Leave empty to build and verify only.'
+        required: false
 
 permissions:
   contents: write
@@ -93,6 +93,7 @@ jobs:
           ./geto --version
 
       - name: Check the tag matches the manifest
+        if: github.ref_type == 'tag' || github.event.inputs.tag != ''
         run: |
           set -eu
           tag="${{ github.event.inputs.tag || github.ref_name }}"
@@ -115,8 +116,11 @@ jobs:
           name: geto_linux_${{ matrix.arch }}
           path: dist/*
 
+  # Skipped when workflow_dispatch runs with no tag, which makes that a dry run:
+  # both architectures build and are checked, and nothing is published.
   release:
     needs: build
+    if: github.ref_type == 'tag' || github.event.inputs.tag != ''
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
