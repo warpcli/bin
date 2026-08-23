@@ -11,7 +11,16 @@ DUB := dub
 DC ?= ldc2
 PREFIX ?= $(HOME)/.local
 ARGS ?=
+
+# release is already -release -O3 -enable-inlining, plus dead-code stripping.
+# NATIVE=1 adds -mcpu=native: faster here, but the binary stops being portable,
+# so releases never use it.
+NATIVE ?= 0
+ifeq ($(NATIVE),1)
+BUILD_TYPE ?= release-native
+else
 BUILD_TYPE ?= release
+endif
 
 HAS_REL := $(shell command -v git-rel 2>/dev/null)
 HAS_CLIFF := $(shell command -v git-cliff 2>/dev/null)
@@ -130,7 +139,7 @@ help:
 	@echo "Usage: make [target]"
 	@echo
 	@echo "Available targets:"
-	@echo "  build         Build the binary (./$(PROJECT_NAME))"
+	@echo "  build         Build the binary (./$(PROJECT_NAME)), optimized"
 	@echo "  compile       Clean and rebuild"
 	@echo "  run           Run locally (pass args with ARGS=...)"
 	@echo "  install       Install to \$$PREFIX/bin (default ~/.local/bin)"
@@ -147,6 +156,7 @@ help:
 	@echo "  release       Release a new version (git-rel)"
 	@echo
 	@echo "Examples:"
+	@echo "  make build NATIVE=1        # tune for this CPU (not portable)"
 	@echo "  make run ARGS='list -t all'"
 	@echo "  make install PREFIX=/usr/local"
 	@echo "  make release TYPE=minor"

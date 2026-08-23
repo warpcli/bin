@@ -50,6 +50,32 @@
         "releaseMode",
         "optimize",
         "inline"
+      ],
+      "comment": "releaseMode/optimize/inline already give -release -O3 -enable-inlining. The section flags plus --gc-sections drop unreferenced code and -s strips symbols, which is what the Go build's -ldflags '-s -w' did.",
+      "dflags-ldc": [
+        "--function-sections",
+        "--data-sections"
+      ],
+      "lflags-ldc": [
+        "--gc-sections",
+        "-s"
+      ]
+    },
+    "release-native": {
+      "buildOptions": [
+        "releaseMode",
+        "optimize",
+        "inline"
+      ],
+      "comment": "Same as release plus -mcpu=native. Faster on the machine that built it, not portable, so never used for releases.",
+      "dflags-ldc": [
+        "--function-sections",
+        "--data-sections",
+        "-mcpu=native"
+      ],
+      "lflags-ldc": [
+        "--gc-sections",
+        "-s"
       ]
     }
   }

@@ -274,7 +274,7 @@ Set as needed in your environment:
 `geto` is written in [D](https://dlang.org) and built with dub.
 
 ```sh
-make build      # build ./geto
+make build      # build ./geto (optimized)
 make install    # install to $PREFIX/bin (default ~/.local/bin)
 make run ARGS='list -t all'
 make test       # dub test
@@ -283,6 +283,12 @@ make static     # fully static build (needs musl static libs — see below)
 make release TYPE=minor   # cut a release via git-rel
 make help       # list all targets
 ```
+
+`make build` uses the `release` build type: `-release -O3 -enable-inlining`,
+plus `--function-sections`/`--data-sections` with `--gc-sections` and `-s` to
+drop unreferenced code and symbols. `make build NATIVE=1` adds `-mcpu=native`,
+which tunes for the building machine and is therefore not portable — releases
+never use it.
 
 ### Layout
 
