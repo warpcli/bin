@@ -30,6 +30,34 @@ class AssetException : Exception
 /// Suppresses the download progress bar.
 bool quiet;
 
+/// Platform lookup, indirected so tests can pretend to be another host.
+struct PlatformResolver
+{
+    string[] delegate() os;
+    string[] delegate() arch;
+    string[] delegate() osExtensions;
+}
+
+private PlatformResolver resolver;
+
+shared static this()
+{
+    resetResolver();
+}
+
+/// Restores the real host platform.
+void resetResolver()
+{
+    resolver = PlatformResolver(() => getOs(), () => getArch(),
+        () => getOsSpecificExtensions());
+}
+
+/// Overrides the platform, for tests.
+void setResolver(PlatformResolver value)
+{
+    resolver = value;
+}
+
 // ---------------------------------------------------------------------------
 // Learned asset selection
 // ---------------------------------------------------------------------------
@@ -306,7 +334,7 @@ bool isUsableAsset(string name)
     foreach (suffix; installableSuffixes)
         if (lower.endsWith(suffix))
             return true;
-    foreach (ext; getOsSpecificExtensions())
+    foreach (ext; resolver.osExtensions())
         if (lower.endsWith("." ~ ext.toLower))
             return true;
 
@@ -335,12 +363,12 @@ private bool[string] archAliasSet(const string[] aliases)
 
 private const(string[]) currentArchGroup()
 {
-    auto current = archAliasSet(getArch());
+    auto current = archAliasSet(resolver.arch());
     foreach (group; archAliasGroups)
         foreach (alias_; group)
             if (alias_.toLower in current)
                 return group;
-    return getArch();
+    return resolver.arch();
 }
 
 private bool containsArchAlias(string name, const string[] aliases)
@@ -470,7 +498,7 @@ private string archiveStem(string name, out bool isTar, out bool isZip)
 Asset[] preferArchiveType(Asset[] assets)
 {
     bool preferTar = false;
-    foreach (name; getOs())
+    foreach (name; resolver.os())
         switch (name)
         {
         case "linux":
@@ -668,9 +696,9 @@ final class Filter
         int[string] scores;
         if (repoName.length > 0)
             scores[repoName] = 1;
-        foreach (name; getOs())
+        foreach (name; resolver.os())
             scores[name] = 10;
-        foreach (name; getArch())
+        foreach (name; resolver.arch())
             scores[name] = 5;
 
         string[] scoreKeys;
@@ -1117,9 +1145,9 @@ string sanitizeName(string name, string versionText)
     string[] pairs;
 
     bool firstPass = true;
-    foreach (osName; getOs())
+    foreach (osName; resolver.os())
     {
-        foreach (archName; getArch())
+        foreach (archName; resolver.arch())
         {
             pairs ~= ["_" ~ osName ~ archName, "-" ~ osName ~ archName, "." ~ osName ~ archName];
             if (firstPass)
@@ -1138,15 +1166,90 @@ string sanitizeName(string name, string versionText)
     return result;
 }
 
+version (unittest)
+{
+    private PlatformResolver fakeResolver(string[] os, string[] arch, string[] extensions)
+    {
+        return PlatformResolver(() => os, () => arch, () => extensions);
+    }
+
+    private auto linuxAmd64()
+    {
+        return fakeResolver(["linux"], ["amd64", "x86_64", "x64", "64"], ["AppImage"]);
+    }
+
+    private auto windowsAmd64()
+    {
+        return fakeResolver(["windows", "win"], ["amd64", "x86_64", "x64", "64"], ["exe"]);
+    }
+
+    private Asset[] assetsNamed(const string[] names)
+    {
+        Asset[] result;
+        foreach (name; names)
+            result ~= new Asset(name, "", "https://example/" ~ name);
+        return result;
+    }
+
+    /// The openai/codex release layout, which stresses the sibling-artifact rules.
+    private Asset[] codexAssets(string versionText)
+    {
+        return assetsNamed([
+            "codex-app-server-package-x86_64-unknown-linux-musl.tar.gz",
+            "codex-app-server-x86_64-unknown-linux-musl.sigstore",
+            "codex-app-server-x86_64-unknown-linux-musl.tar.gz",
+            "codex-npm-linux-x64-" ~ versionText ~ ".tgz",
+            "codex-package-x86_64-unknown-linux-musl.tar.gz",
+            "codex-responses-api-proxy-x86_64-unknown-linux-musl.sigstore",
+            "codex-responses-api-proxy-x86_64-unknown-linux-musl.tar.gz",
+            "codex-symbols-x86_64-unknown-linux-musl-app-server.tar.gz",
+            "codex-symbols-x86_64-unknown-linux-musl.tar.gz",
+            "codex-x86_64-unknown-linux-musl.sigstore",
+            "codex-x86_64-unknown-linux-musl.tar.gz",
+            "codex-zsh-x86_64-unknown-linux-musl.tar.gz",
+            "openai_codex_cli_bin-" ~ versionText ~ "-py3-none-manylinux_2_17_x86_64.whl",
+        ]);
+    }
+}
+
 unittest
 {
+    scope (exit)
+        resetResolver();
+
+    // --- name normalization -------------------------------------------------
     assert(normalizeAssetName("bat-v0.24.0-x86_64-linux.tar.gz") == "bat-v#-x#_#-linux.tar.gz");
     assert(fingerprint([new Asset("b.tar.gz"), new Asset("a.zip")]) == ["a.zip", "b.tar.gz"]);
 
-    assert(isUsableAsset("tool-linux-amd64.tar.gz"));
-    assert(!isUsableAsset("tool.sha256"));
-    assert(!isUsableAsset("tool-update"));
-    assert(isUsableAsset("tool-1.2.3-linux-amd64"));
+    // Same asset across releases must normalize equal.
+    foreach (pair; [
+            ["codex-npm-linux-x64-0.140.0.tgz", "codex-npm-linux-x64-0.141.0.tgz"],
+            ["tool-v1.2.3-linux", "tool-v9.0.0-linux"],
+        ])
+        assert(normalizeAssetName(pair[0]) == normalizeAssetName(pair[1]));
+    assert(normalizeAssetName("codex-x86_64-unknown-linux-musl.tar.gz")
+            != normalizeAssetName("codex-zsh-x86_64-unknown-linux-musl.tar.gz"));
+
+    // --- usability ----------------------------------------------------------
+    setResolver(linuxAmd64());
+    foreach (name; [
+            "codex-x86_64-unknown-linux-musl.tar.gz",
+            "codex-npm-linux-x64-0.140.0.tgz",
+            "jq-linux64",
+            "tool-v0.140.0",
+            "Ultimaker_Cura-4.8.0.AppImage",
+        ])
+        assert(isUsableAsset(name), name);
+    foreach (name; [
+            "codex-x86_64-unknown-linux-musl.sigstore",
+            "openai_codex_cli_bin-0.140.0-py3-none-manylinux_2_17_x86_64.whl",
+            "checksums.txt",
+            "codex.tar.gz.sha256",
+            "release.sbom.json",
+            "pkg.deb",
+            "tool-update",
+        ])
+        assert(!isUsableAsset(name), name);
 
     assert(isSupportedExt("tool.tar.gz"));
     assert(!isSupportedExt("tool.deb"));
@@ -1155,12 +1258,110 @@ unittest
     bool isTar, isZip;
     assert(archiveStem("Tool.TAR.GZ", isTar, isZip) == "tool" && isTar);
 
-    auto assets = [
-        new Asset("tool-linux-amd64-musl.tar.gz"),
-        new Asset("tool-linux-amd64-gnu.tar.gz"),
-    ];
-    assert(preferMusl(assets).length == 1);
+    // --- preference rules ---------------------------------------------------
+    assert(preferMusl(assetsNamed([
+            "tool-linux-amd64-musl.tar.gz", "tool-linux-amd64-gnu.tar.gz"
+        ])).length == 1);
 
     assert(packageNameRank("bat-v0.24.0-x86_64-linux.tar.gz", "bat") == 3);
     assert(packageNameRank("ripgrep.tar.gz", "bat") == 0);
+}
+
+unittest
+{
+    scope (exit)
+        resetResolver();
+
+    // Scoring must land on the host's asset without prompting.
+    static struct Case
+    {
+        string repo;
+        string[] names;
+        string expected;
+        bool windows;
+    }
+
+    const cases = [
+        Case("bin", [
+            "bin_0.0.1_Linux_x86_64", "bin_0.0.1_Linux_i386", "bin_0.0.1_Darwin_x86_64"
+        ], "bin_0.0.1_Linux_x86_64", false),
+        Case("gitlab-runner", [
+            "gitlab-runner-windows-amd64", "gitlab-runner-linux-amd64",
+            "gitlab-runner-darwin-amd64"
+        ], "gitlab-runner-linux-amd64", false),
+        Case("yq", [
+            "yq_freebsd_amd64", "yq_linux_amd64", "yq_windows_amd64.exe"
+        ], "yq_linux_amd64", false),
+        Case("jq", ["jq-win64.exe", "jq-linux64", "jq-osx-amd64"], "jq-linux64", false),
+        Case("tezos", ["x86_64-linux-tezos-binaries.tar.gz"],
+            "x86_64-linux-tezos-binaries.tar.gz", false),
+        Case("launchpad", ["launchpad-linux-x64", "launchpad-win-x64.exe"],
+            "launchpad-linux-x64", false),
+        Case("usql", [
+            "usql-0.8.2-darwin-amd64.tar.bz2", "usql-0.8.2-linux-amd64.tar.bz2",
+            "usql-0.8.2-windows-amd64.zip"
+        ], "usql-0.8.2-linux-amd64.tar.bz2", false),
+        Case("cli", ["dapr"], "dapr", false),
+        Case("launchpad", ["launchpad-linux-x64", "launchpad-win-x64.exe"],
+            "launchpad-win-x64.exe", true),
+        Case("bin", [
+            "bin_0.0.1_Windows_x86_64.exe", "bin_0.1.0_Linux_x86_64",
+            "bin_0.1.0_Darwin_x86_64"
+        ], "bin_0.0.1_Windows_x86_64.exe", true),
+        Case("usql", [
+            "usql-0.8.2-darwin-amd64.tar.bz2", "usql-0.8.2-linux-amd64.tar.bz2",
+            "usql-0.8.2-windows-amd64.zip"
+        ], "usql-0.8.2-windows-amd64.zip", true),
+    ];
+
+    foreach (testCase; cases)
+    {
+        setResolver(testCase.windows ? windowsAmd64() : linuxAmd64());
+        auto filter = new Filter(FilterOpts.init);
+        auto chosen = filter.filterAssets(testCase.repo, assetsNamed(testCase.names));
+        assert(chosen.name == testCase.expected,
+            testCase.repo ~ ": got " ~ chosen.name ~ ", want " ~ testCase.expected);
+    }
+}
+
+unittest
+{
+    scope (exit)
+        resetResolver();
+    setResolver(linuxAmd64());
+
+    const chosen = "codex-app-server-x86_64-unknown-linux-musl.tar.gz";
+    auto marks = fingerprint(filterUsableAssets(codexAssets("0.140.0")));
+
+    // A pure version bump keeps the layout, so the remembered choice is reused
+    // and the user is never prompted.
+    FilterOpts opts;
+    opts.selectedAsset = normalizeAssetName(chosen);
+    opts.assetFingerprint = marks;
+    auto filter = new Filter(opts);
+    assert(filter.selectReleaseAsset("codex", codexAssets("0.141.0")).name == chosen);
+
+    // A genuinely new installable file changes the fingerprint, which is what
+    // forces the re-prompt.
+    auto extended = codexAssets("0.141.0")
+        ~ new Asset("codex-extra-x86_64-unknown-linux-musl.tar.gz");
+    assert(fingerprint(filterUsableAssets(extended)) != marks);
+}
+
+unittest
+{
+    scope (exit)
+        resetResolver();
+
+    setResolver(linuxAmd64());
+    assert(sanitizeName("bin_amd64_linux", "v0.0.1") == "bin");
+    assert(sanitizeName("bin_0.0.1_amd64_linux", "0.0.1") == "bin");
+    assert(sanitizeName("bin_0.0.1_amd64_linux", "v0.0.1") == "bin");
+    assert(sanitizeName("gitlab-runner-linux-amd64", "v13.2.1") == "gitlab-runner");
+    assert(sanitizeName("jq-linux64", "jq-1.5") == "jq");
+    assert(sanitizeName("launchpad-linux-x64", "1.2.0-rc.1") == "launchpad");
+
+    setResolver(windowsAmd64());
+    assert(sanitizeName("launchpad-win-x64.exe", "1.2.0-rc.1") == "launchpad.exe");
+    assert(sanitizeName("bin_0.0.1_Windows_x86_64.exe", "0.0.1") == "bin.exe");
 }

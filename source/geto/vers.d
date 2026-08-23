@@ -217,3 +217,24 @@ unittest
     assert(parseStrictVersion("1.2.3", s) && s.preRelease.length == 0);
     assert(!parseStrictVersion("1.2", s));
 }
+
+unittest
+{
+    // The update check: only a strictly higher version counts.
+    assert(isNewer("1.1.0", "1.1.1"));
+    assert(!isNewer("1.2.0-rc.1", "1.1.1"));
+    assert(!isNewer("1.1.1", "1.1.1"));
+    assert(isNewer("1.2.0-rc.1", "1.2.0"));
+    assert(isNewer("v0.26.0", "v0.26.1"));
+
+    // Unparseable versions fall back to plain inequality, as hashicorp does.
+    assert(isNewer("nightly", "nightly-2"));
+    assert(!isNewer("nightly", "nightly"));
+
+    // isNotNewer is the update guard: true only when both parse and the
+    // candidate is at or below the installed version.
+    assert(isNotNewer("1.2.0", "1.1.0"));
+    assert(isNotNewer("1.2.0", "1.2.0"));
+    assert(!isNotNewer("1.2.0", "1.3.0"));
+    assert(!isNotNewer("nightly", "whatever"));
+}

@@ -2,7 +2,7 @@ module geto.config;
 
 import std.algorithm : canFind;
 import std.array : array, split;
-import std.file : DirEntry, dirEntries, exists, isDir, mkdirRecurse, readText, rename, SpanMode, write;
+import std.file;
 import std.json : JSONOptions, JSONType, JSONValue, parseJSON, toJSON;
 import std.path : baseName, buildPath, dirName, extension, stripExtension;
 import std.process : environment;
@@ -101,7 +101,7 @@ private Config cfg;
 private PathOverrides overrides;
 
 /// Overridden in tests to exercise the root/system code paths.
-package int function() effectiveUid;
+package int delegate() effectiveUid;
 
 static this()
 {
@@ -1078,4 +1078,200 @@ string stateDir()
         return getStatePath("").dirName;
     catch (Exception)
         return "";
+}
+
+version (unittest)
+{
+    import std.file : rmdirRecurse, tempDir;
+    import std.path : buildPath;
+
+    /// Points every path lookup at a throwaway directory and pretends to be
+    /// `uid`, so the root/system branches can be exercised without root.
+    private struct ConfigSandbox
+    {
+        string root;
+
+        static ConfigSandbox open(int uid, string name)
+        {
+            import std.file : mkdirRecurse;
+
+            ConfigSandbox sandbox;
+            sandbox.root = buildPath(tempDir, "geto-test-" ~ name);
+            if (sandbox.root.exists)
+                rmdirRecurse(sandbox.root);
+            mkdirRecurse(sandbox.root);
+
+            setPathOverrides(PathOverrides.init);
+            foreach (name_; [
+                    "GETO_CONFIG_FILE", "GETO_CONFIG_HOME", "GETO_STATE_FILE",
+                    "GETO_STATE_HOME", "GETO_DEFAULT_PATH", "XDG_CONFIG_HOME",
+                    "XDG_STATE_HOME", "XDG_DATA_HOME"
+                ])
+                environment.remove(name_);
+            environment["HOME"] = sandbox.root;
+            effectiveUid = () => uid;
+            return sandbox;
+        }
+
+        void close()
+        {
+            import core.sys.posix.unistd : geteuid;
+
+            effectiveUid = () => cast(int) geteuid();
+            setPathOverrides(PathOverrides.init);
+            try
+                rmdirRecurse(root);
+            catch (Exception)
+            {
+            }
+        }
+    }
+}
+
+unittest
+{
+    // A normal user gets XDG config and state, and an install dir under ~/.local.
+    auto sandbox = ConfigSandbox.open(1000, "xdg");
+    scope (exit)
+        sandbox.close();
+
+    const configPath = getConfigPath();
+    assert(configPath == buildPath(sandbox.root, ".config", "geto", "list.json"), configPath);
+    const statePath = getStatePath(configPath);
+    assert(statePath == buildPath(sandbox.root, ".local", "state", "geto", "config.state.json"));
+
+    checkAndLoad();
+    assert(cfg.defaultPath == buildPath(sandbox.root, ".local", "bin"));
+    foreach (dir; [
+            buildPath(sandbox.root, ".local", "bin"),
+            buildPath(sandbox.root, ".local", "state", "geto")
+        ])
+        assert(dir.exists && dir.isDir, dir);
+}
+
+unittest
+{
+    // Root must not fall back to its own home directory.
+    auto sandbox = ConfigSandbox.open(0, "system");
+    scope (exit)
+        sandbox.close();
+
+    assert(getConfigPath() == "/etc/geto/list.json");
+    assert(getStatePath("/etc/geto/list.json") == "/var/lib/geto/config.state.json");
+    assert(defaultInstallPath() == "/usr/local/bin");
+}
+
+unittest
+{
+    // Root with explicit overrides may manage paths anywhere.
+    auto sandbox = ConfigSandbox.open(0, "rootenv");
+    scope (exit)
+        sandbox.close();
+
+    const configFile = buildPath(sandbox.root, "etc", "geto", "list.json");
+    const stateFile = buildPath(sandbox.root, "var", "lib", "geto", "config.state.json");
+    const installDir = buildPath(sandbox.root, "usr", "local", "bin");
+    environment["GETO_CONFIG_FILE"] = configFile;
+    environment["GETO_STATE_FILE"] = stateFile;
+    environment["GETO_DEFAULT_PATH"] = installDir;
+
+    checkAndLoad();
+    assert(cfg.defaultPath == installDir);
+    foreach (path; [configFile, stateFile, installDir])
+        assert(path.exists, path);
+}
+
+unittest
+{
+    // System paths must be absolute and free of shell/home expansion.
+    auto sandbox = ConfigSandbox.open(0, "validate");
+    scope (exit)
+        sandbox.close();
+
+    bool rejected(string path)
+    {
+        try
+            validateSystemPath("binary path", path);
+        catch (ConfigException)
+            return true;
+        return false;
+    }
+
+    assert(rejected("$HOME/bin/tool"));
+    assert(rejected("~/bin/tool"));
+    assert(rejected("relative/tool"));
+    assert(!rejected("/usr/local/bin/tool"));
+}
+
+unittest
+{
+    // A manifest entry with no path installs into default_path under its key.
+    auto sandbox = ConfigSandbox.open(1000, "pathless");
+    scope (exit)
+        sandbox.close();
+
+    const configFile = buildPath(sandbox.root, "list.json");
+    const installDir = buildPath(sandbox.root, "bin");
+    environment["GETO_CONFIG_FILE"] = configFile;
+    environment["GETO_STATE_FILE"] = buildPath(sandbox.root, "state.json");
+    environment["GETO_DEFAULT_PATH"] = installDir;
+    std.file.write(configFile, `{"bins":{"tool":{"url":"github.com/o/tool"}}}`);
+
+    checkAndLoad();
+    const expected = buildPath(installDir, "tool");
+    auto binary = expected in cfg.bins;
+    assert(binary !is null, "entry should be re-keyed by its resolved path");
+    assert((*binary).path == expected);
+    assert((*binary).tags == ["default"]);
+}
+
+unittest
+{
+    // Forgetting a selection clears the remembered choice but keeps identity.
+    auto sandbox = ConfigSandbox.open(1000, "forget");
+    scope (exit)
+        sandbox.close();
+
+    const configFile = buildPath(sandbox.root, "list.json");
+    environment["GETO_CONFIG_FILE"] = configFile;
+    environment["GETO_STATE_FILE"] = buildPath(sandbox.root, "state.json");
+    environment["GETO_DEFAULT_PATH"] = buildPath(sandbox.root, "bin");
+    std.file.write(configFile, `{"bins":{}}`);
+    checkAndLoad();
+
+    auto binary = new Binary;
+    binary.path = buildPath(sandbox.root, "bin", "tool");
+    binary.url = "github.com/o/tool";
+    binary.versionText = "v1.0.0";
+    binary.hash = "abc";
+    binary.pinned = true;
+    binary.remoteName = "tool-linux";
+    binary.packagePath = "tool-linux/tool";
+    binary.selectedAsset = "tool-#-linux.tar.gz";
+    binary.assetFingerprint = ["tool-#-linux.tar.gz"];
+    binary.packageFingerprint = ["tool-linux/tool"];
+    binary.tags = ["default"];
+    upsertBinary(binary);
+
+    forgetBinarySelection(binary.path);
+
+    auto stored = *(binary.path in cfg.bins);
+    assert(stored.selectedAsset.length == 0);
+    assert(stored.assetFingerprint.length == 0);
+    assert(stored.packageFingerprint.length == 0);
+    assert(stored.remoteName.length == 0);
+    assert(stored.packagePath.length == 0);
+    // Identity, version, hash and pin state survive.
+    assert(stored.url == "github.com/o/tool");
+    assert(stored.versionText == "v1.0.0");
+    assert(stored.hash == "abc");
+    assert(stored.pinned);
+}
+
+unittest
+{
+    assert(urlHost("https://github.com/o/r") == "github.com");
+    assert(urlPath("https://github.com/o/r") == "/o/r");
+    assert(urlScheme("https://github.com/o/r") == "https");
+    assert(defaultBinaryName("https://github.com/sharkdp/bat.git") == "bat");
 }

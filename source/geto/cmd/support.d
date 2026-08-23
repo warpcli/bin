@@ -228,3 +228,44 @@ unittest
     assert(tagFilterAll());
     activeTags = null;
 }
+
+unittest
+{
+    import geto.config : Binary;
+
+    auto untagged = new Binary;
+    assert(binTags(untagged) == ["default"]);
+
+    auto tagged = new Binary;
+    tagged.tags = ["essential", "cli"];
+    assert(binTags(tagged) == ["essential", "cli"]);
+    assert(binHasAnyTag(tagged, ["cli"]));
+    assert(binHasAnyTag(untagged, ["default"]));
+    assert(!binHasAnyTag(tagged, ["other"]));
+
+    auto previous = activeTags.dup;
+    scope (exit)
+        activeTags = previous;
+
+    activeTags = null;
+    assert(wantedTags() == ["default"] && !tagFilterAll());
+    activeTags = ["essential"];
+    assert(wantedTags() == ["essential"] && !tagFilterAll());
+    activeTags = ["all"];
+    assert(tagFilterAll());
+
+    auto first = new Binary;
+    first.path = "/bin/a";
+    first.tags = ["default"];
+    auto second = new Binary;
+    second.path = "/bin/b";
+    second.tags = ["essential"];
+    Binary[string] bins = ["/bin/a": first, "/bin/b": second];
+
+    activeTags = ["all"];
+    assert(selectByTag(bins).length == 2);
+    activeTags = ["essential"];
+    assert(selectByTag(bins).length == 1 && ("/bin/b" in selectByTag(bins)) !is null);
+    activeTags = null;
+    assert(selectByTag(bins).length == 1 && ("/bin/a" in selectByTag(bins)) !is null);
+}
