@@ -30,7 +30,7 @@ $(info Project: $(PROJECT_NAME) v$(PROJECT_VERSION))
 $(info ------------------------------------------)
 
 .PHONY: build b compile c run r install uninstall test t test-all cover check static \
-	fmt fmt-check clean changelog verify release help h
+	lock lock-check fmt fmt-check clean changelog verify release help h
 
 build:
 	@$(DUB) build --compiler=$(DC) --build=$(BUILD_TYPE)
@@ -110,6 +110,23 @@ fmt-check:
 	if [ -n "$$out" ]; then echo "dfmt needed on:$$out"; exit 1; fi; \
 	echo "formatting ok"
 
+# dub-lock.json feeds the Nix build. It is generated from dub.selections.json,
+# so re-pinning a git dependency in dub.json without regenerating it makes
+# `nix build` fall back to fetching over git, which the sandbox forbids.
+lock:
+	@dub upgrade >/dev/null
+	@dub-to-nix > dub-lock.json
+	@echo "regenerated dub-lock.json"
+
+# lock-check fails when the lock no longer matches the selections it came from.
+lock-check:
+	@python3 -c "import json,sys; \
+sel=json.load(open('dub.selections.json'))['versions']; \
+lock=json.load(open('dub-lock.json'))['dependencies']; \
+bad=[k for k,v in sel.items() if k in lock and lock[k]['version'] != (v['version'] if isinstance(v,dict) else v)]; \
+sys.exit('dub-lock.json is stale for: ' + ', '.join(bad) + \" -- run 'make lock'\") if bad else None"
+	@echo "dub-lock.json matches dub.selections.json"
+
 clean:
 	@$(DUB) clean >/dev/null 2>&1 || true
 	@rm -f $(PROJECT_NAME) $(PROJECT_NAME)-test-* *.lst
@@ -121,7 +138,7 @@ changelog:
 	fi
 	@git cliff -o CHANGELOG.md
 
-verify: fmt-check test
+verify: fmt-check lock-check test
 
 release:
 	@if [ -z "$(HAS_REL)" ]; then \
@@ -150,6 +167,7 @@ help:
 	@echo "  verify-static Check an existing binary has no libc dependency"
 	@echo "  fmt           Format the tree with dfmt"
 	@echo "  fmt-check     Fail if anything is unformatted"
+	@echo "  lock          Regenerate dub-lock.json (after changing a dependency)"
 	@echo "  clean         Remove build artifacts"
 	@echo "  changelog     Regenerate CHANGELOG.md (git-cliff)"
 	@echo "  verify        Run the local gate (fmt-check + test)"

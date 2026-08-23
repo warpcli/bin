@@ -315,7 +315,8 @@ make build      # build ./geto (optimized)
 make install    # install to $PREFIX/bin (default ~/.local/bin)
 make run ARGS='list -t all'
 make test       # dub test
-make verify     # fmt-check + test
+make verify     # fmt-check + lock-check + test
+make lock       # regenerate dub-lock.json after changing a dependency
 make static     # fully static build (needs musl static libs — see below)
 make release TYPE=minor   # cut a release via git-rel
 make help       # list all targets
@@ -340,7 +341,10 @@ never use it.
 | `source/geto/ui/` | palette, table, progress bar and prompts |
 | `source/geto/cmd/` | CLI commands and the interactive TUI |
 
-The TUI is built on [mochafizz](https://github.com/bresilla/mochafizz).
+The TUI is built on [mochafizz](https://github.com/bresilla/mochafizz), pinned
+by commit in `dub.json`. `dub-lock.json` feeds the Nix build, so re-pinning a
+dependency means running `make lock` — otherwise `nix build` tries to fetch over
+git, which the sandbox forbids. `make verify` checks the two agree.
 
 ### Static builds
 
