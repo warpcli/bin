@@ -1,11 +1,13 @@
 module app;
 
+import core.stdc.stdlib : exit;
+
+import geto.cmd.root : run;
+
+/// Overridden at build time via `-version=...`; kept simple for local builds.
+enum buildVersion = "0.4.0-d";
+
 void main(string[] args)
 {
-    import std.stdio : writeln;
-    import geto.http : getOrThrow;
-
-    auto response = getOrThrow("https://api.github.com/repos/sharkdp/bat/releases/latest");
-    writeln("status=", response.status, " bytes=", response.content.length);
-    writeln(response.text[0 .. 120]);
+    exit(run(buildVersion, args[1 .. $]));
 }
