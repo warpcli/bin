@@ -171,7 +171,15 @@ writes `/var/lib/geto/config.state.json`, and installs into `/usr/local/bin`.
 | HashiCorp | `geto install releases.hashicorp.com/terraform` |
 | `go install` | `geto install goinstall://github.com/x/y` |
 
-Asset selection scores candidates by OS/arch and filters out non-installable files (`.sig`, `.sha256`, `.sbom`, `.deb`, …). Your pick is remembered, so updates don't re-prompt unless the release's file layout changes (use `update -r` to force a re-pick).
+Asset selection scores candidates by OS/arch and filters out non-installable
+files (`.sig`, `.sha256`, `.sbom`, `.deb`, …), source archives and install
+scripts. Assets built for another operating system are dropped, and a release
+with no build for your platform fails with a clear message instead of offering
+a Windows or macOS artefact — pass `--all` to pick from everything anyway.
+Where a release ships twins, musl wins over glibc/gcc and static over dynamic.
+
+Your pick is remembered, so updates don't re-prompt unless the release's file
+layout changes (use `update -r` to force a re-pick).
 
 ---
 

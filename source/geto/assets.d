@@ -300,7 +300,7 @@ shared static this()
         "sha256", "sha512", "sha1", "md5", "sum", "checksum", "sig", "sigstore",
         "asc", "gpg", "pem", "pub", "crt", "cert", "minisig", "sbom", "spdx",
         "cdx", "intoto", "jsonl", "json", "txt", "md", "yaml", "yml", "deb",
-        "rpm", "msi", "pkg", "dmg", "apk", "snap", "flatpak", "whl",
+        "rpm", "msi", "pkg", "dmg", "apk", "snap", "flatpak", "whl", "ps1",
         // libraries and object files are never the CLI binary we want.
         "a", "o", "so", "dll", "dylib", "lib"
     ])
@@ -367,11 +367,35 @@ private const(string[]) currentArchGroup()
     return resolver.arch();
 }
 
+/// True when `needle` occurs in `text` without a letter directly before it.
+/// Plain substring matching made the short arch aliases fire inside longer
+/// words — "x64" matches inside "linux64", so `jq-linux64` scored as an
+/// explicit amd64 build and tied with the real `jq-linux-amd64`.
+package bool containsToken(string text, string needle)
+{
+    import std.ascii : isAlpha;
+
+    if (needle.length == 0)
+        return false;
+    size_t from = 0;
+    while (from + needle.length <= text.length)
+    {
+        const at = text[from .. $].indexOf(needle);
+        if (at < 0)
+            return false;
+        const start = from + at;
+        if (start == 0 || !text[start - 1].isAlpha)
+            return true;
+        from = start + 1;
+    }
+    return false;
+}
+
 private bool containsArchAlias(string name, const string[] aliases)
 {
     const lower = name.toLower;
     foreach (alias_; aliases)
-        if (lower.canFind(alias_.toLower))
+        if (lower.containsToken(alias_.toLower))
             return true;
     return false;
 }
@@ -401,6 +425,72 @@ private bool hasForeignArch(string name)
     return false;
 }
 
+/// Tokens that mark an asset as built for a particular operating system.
+private immutable string[][] osAliasGroups = [
+    ["linux"], ["windows", "win32", "win64", "win", "msvc", "mingw"],
+    ["darwin", "macos", "osx", "apple", "mac"], ["freebsd"], ["openbsd"],
+    ["netbsd"], ["dragonfly"], ["solaris"], ["illumos"], ["android"], ["ios"],
+];
+
+private const(string[]) currentOsGroup()
+{
+    auto current = archAliasSet(resolver.os());
+    foreach (group; osAliasGroups)
+        foreach (alias_; group)
+            if (alias_.toLower in current)
+                return group;
+    return resolver.os();
+}
+
+/// True when the name names an operating system that is not this one. Assets
+/// that name no OS at all are not foreign — plenty of releases ship a bare
+/// `tool_x86_64` that runs here.
+bool hasForeignOs(string name)
+{
+    auto native = archAliasSet(currentOsGroup());
+    const lower = name.toLower;
+    foreach (group; osAliasGroups)
+    {
+        bool isNativeGroup = false;
+        foreach (alias_; group)
+            if (alias_.toLower in native)
+            {
+                isNativeGroup = true;
+                break;
+            }
+        if (isNativeGroup)
+            continue;
+        foreach (alias_; group)
+            if (lower.containsToken(alias_))
+                return true;
+    }
+    return false;
+}
+
+/// Drops assets built for another operating system. Without this a release
+/// that ships no Linux build still scored its Windows zip on the architecture
+/// alone — espanso installed `Espanso-Win-Portable-x86_64.zip`, then offered
+/// its DLLs as the binary to install.
+Asset[] preferNativeOs(Asset[] assets)
+{
+    Asset[] result;
+    foreach (asset; assets)
+        if (!hasForeignOs(asset.name))
+            result ~= asset;
+    return result.length > 0 ? result : assets;
+}
+
+/// True when every candidate targets another operating system.
+bool allForeignOs(Asset[] assets)
+{
+    if (assets.length == 0)
+        return false;
+    foreach (asset; assets)
+        if (!hasForeignOs(asset.name))
+            return false;
+    return true;
+}
+
 /// Drops foreign-architecture assets once a native one is present. Releases
 /// with no native match keep their full set so a manual choice stays possible.
 Asset[] preferNativeArch(Asset[] assets)
@@ -423,16 +513,41 @@ Asset[] preferNativeArch(Asset[] assets)
 }
 
 /// Collapses libc-flavor twins, keeping musl when both are offered.
+/// Removes `tokens` from a name and collapses the separators left behind, so
+/// `tool-x64` and `tool-x64-static` land in the same group.
+private string collapseTokens(string name, const string[] tokens)
+{
+    import std.array : appender, replace;
+    import std.ascii : isAlphaNum;
+
+    auto lower = name.toLower;
+    foreach (token; tokens)
+        lower = lower.replace(token, "");
+
+    auto output = appender!string;
+    bool pendingSeparator = false;
+    foreach (c; lower)
+    {
+        if (c.isAlphaNum)
+        {
+            if (pendingSeparator && output.data.length > 0)
+                output ~= '-';
+            pendingSeparator = false;
+            output ~= c;
+        }
+        else
+            pendingSeparator = true;
+    }
+    return output.data;
+}
+
 Asset[] preferMusl(Asset[] assets)
 {
     static string stem(string name)
     {
-        import std.array : replace;
-
-        auto lower = name.toLower;
-        foreach (token; ["musl", "glibc", "gnu"])
-            lower = lower.replace(token, "");
-        return lower;
+        // "gcc" marks a glibc build just as "gnu" does; without it vopono's
+        // `_gcc` and `_musl` builds never grouped together.
+        return collapseTokens(name, ["musl", "glibc", "gnu", "gcc"]);
     }
 
     Asset[][string] groups;
@@ -459,10 +574,65 @@ Asset[] preferMusl(Asset[] assets)
         foreach (asset; group)
         {
             const lower = asset.name.toLower;
-            if (hasMusl && (lower.canFind("gnu") || lower.canFind("glibc")))
+            if (hasMusl && (lower.canFind("gnu") || lower.canFind("glibc")
+                    || lower.containsToken("gcc")))
                 continue; // drop the glibc/gnu twin in favor of musl
             result ~= asset;
         }
+    }
+    return result;
+}
+
+/// Drops source archives and install scripts when a real artifact is on offer.
+/// `hck` ships `hck-linux-amd64` beside `hck-linux-amd64-src.tar.gz`, and
+/// `flawz` ships a `flawz-installer.sh`; only the built binary is something
+/// geto can install and run.
+Asset[] preferBuilt(Asset[] assets)
+{
+    static bool isSource(string name)
+    {
+        auto tokens = assetTokens(name);
+        foreach (token; ["src", "source", "sources", "installer"])
+            if (tokens.canFind(token))
+                return true;
+        return false;
+    }
+
+    Asset[] result;
+    foreach (asset; assets)
+        if (!isSource(asset.name))
+            result ~= asset;
+    return result.length > 0 ? result : assets;
+}
+
+/// Keeps the statically linked twin when a release ships both, the same way
+/// musl wins over glibc. ffsend ships `linux-x64` and `linux-x64-static`.
+Asset[] preferStatic(Asset[] assets)
+{
+    Asset[][string] groups;
+    string[] order;
+    foreach (asset; assets)
+    {
+        const key = collapseTokens(asset.name, ["static"]);
+        if (key !in groups)
+            order ~= key;
+        groups[key] ~= asset;
+    }
+
+    Asset[] result;
+    foreach (key; order)
+    {
+        auto group = groups[key];
+        bool hasStatic = false;
+        foreach (asset; group)
+            if (asset.name.toLower.containsToken("static"))
+            {
+                hasStatic = true;
+                break;
+            }
+        foreach (asset; group)
+            if (!hasStatic || asset.name.toLower.containsToken("static"))
+                result ~= asset;
     }
     return result;
 }
@@ -549,6 +719,20 @@ Asset[] preferArchiveType(Asset[] assets)
     return result;
 }
 
+/// Narrows a release to the assets that suit this machine. Order matters:
+/// drop non-artifacts first, then container format, libc, architecture,
+/// operating system, and finally static twins.
+Asset[] narrowToPlatform(Asset[] assets)
+{
+    auto result = preferBuilt(assets);
+    result = preferArchiveType(result);
+    result = preferMusl(result);
+    result = preferNativeArch(result);
+    result = preferNativeOs(result);
+    result = preferStatic(result);
+    return result;
+}
+
 private Asset[] filterUsableAssets(Asset[] assets)
 {
     Asset[] result;
@@ -563,7 +747,8 @@ private Asset[] filterUsableAssets(Asset[] assets)
 }
 
 /// Runs the selection pipeline over asset names without downloading anything.
-/// Returns the auto-selected name, or the candidates a user would be asked about.
+/// Returns the auto-selected name, or the candidates a user would be asked
+/// about; both empty means the release has no build for this platform.
 void preview(string repoName, const string[] names, out string chosen, out string[] options)
 {
     Asset[] assets;
@@ -573,11 +758,16 @@ void preview(string repoName, const string[] names, out string chosen, out strin
     auto usable = filterUsableAssets(assets);
     if (usable.length == 0)
         usable = assets;
-    usable = preferArchiveType(usable);
-    usable = preferMusl(usable);
-    usable = preferNativeArch(usable);
+    // No compatible build: report nothing rather than a foreign-platform pick.
+    if (allForeignOs(preferBuilt(usable)))
+        return;
+    usable = narrowToPlatform(usable);
 
-    auto filter_ = new Filter(FilterOpts.init);
+    // The real install path ranks against the package name, so preview must
+    // too or it reports prompts that never actually happen.
+    FilterOpts options_;
+    options_.packageName = repoName;
+    auto filter_ = new Filter(options_);
     auto matches = filter_.scoredMatches(repoName, usable);
     if (matches.length == 1)
     {
@@ -591,6 +781,14 @@ void preview(string repoName, const string[] names, out string chosen, out strin
 // ---------------------------------------------------------------------------
 // Filter
 // ---------------------------------------------------------------------------
+
+private bool matchesAnyToken(string text, const string[] needles)
+{
+    foreach (needle; needles)
+        if (text.containsToken(needle))
+            return true;
+    return false;
+}
 
 /// Selects which release asset to install and unpacks it.
 final class Filter
@@ -618,9 +816,13 @@ final class Filter
             debugf("No installable assets after filtering; falling back to full list");
             usable = assets;
         }
-        usable = preferArchiveType(usable);
-        usable = preferMusl(usable);
-        usable = preferNativeArch(usable);
+        // Source archives and install scripts go first: a release whose only
+        // non-foreign entries are those still has no build for this platform.
+        // --all keeps the raw list, so none of this runs.
+        if (!opts.skipScoring && allForeignOs(preferBuilt(usable)))
+            throw new AssetException("this release has no build for " ~ resolver.os()[0] ~ "/" ~ resolver.arch()[0]
+                    ~ "; run with --all to pick from every asset");
+        usable = narrowToPlatform(usable);
 
         auto marks = fingerprint(usable);
 
@@ -705,10 +907,10 @@ final class Filter
         {
             auto candidate = makeFiltered(repoName, asset, null);
             int total = 0;
-            if (asset.name.toLower.containsAny(scoreKeys) && isSupportedExt(asset.name))
+            if (matchesAnyToken(asset.name.toLower, scoreKeys) && isSupportedExt(asset.name))
             {
                 foreach (key, value; scores)
-                    if (asset.name.toLower.canFind(key.toLower))
+                    if (asset.name.toLower.containsToken(key.toLower))
                     {
                         debugf("Candidate %s contains %s. Adding score %d", asset.name, key, value);
                         total += value;
@@ -1022,6 +1224,13 @@ bool isSupportedExt(string filename)
     if (ext.length == 0)
         return true;
 
+    // AppImage is installable here (isUsableAsset keeps it), so it has to be
+    // scoreable too. Without this espanso's X11 AppImage was silently ignored
+    // and its Windows zip won by default.
+    foreach (native; resolver.osExtensions())
+        if (ext == native.toLower)
+            return true;
+
     switch (kindForExtension(ext))
     {
     case FileKind.msi:
@@ -1108,12 +1317,30 @@ private string[] assetTokens(string name)
     return result;
 }
 
+/// True when the token is entirely a version, e.g. "1", "v2", "1.2.3".
+private bool isVersionToken(string token)
+{
+    import std.ascii : isDigit;
+
+    auto rest = token;
+    if (rest.length > 1 && (rest[0] == 'v' || rest[0] == 'V'))
+        rest = rest[1 .. $];
+    if (rest.length == 0)
+        return false;
+    foreach (c; rest)
+        if (!(c.isDigit || c == '.'))
+            return false;
+    return true;
+}
+
 private bool isPlatformOrVersionToken(string token)
 {
     if (token.length == 0)
         return false;
-    // An unanchored match: any token containing digits counts as a version.
-    if (!token.matchFirst(assetVersionRe).empty)
+    // The whole token has to look like a version. Matching anywhere inside it
+    // made "pkcs11" read as one, so restish's pkcs11 build ranked level with
+    // the plain binary instead of losing to it.
+    if (isVersionToken(token))
         return true;
     switch (token)
     {
@@ -1361,4 +1588,127 @@ unittest
     setResolver(windowsAmd64());
     assert(sanitizeName("launchpad-win-x64.exe", "1.2.0-rc.1") == "launchpad.exe");
     assert(sanitizeName("bin_0.0.1_Windows_x86_64.exe", "0.0.1") == "bin.exe");
+}
+
+unittest
+{
+    // Word-boundary matching: the short arch aliases must not fire inside a
+    // longer word, which is what made "linux64" read as an explicit x64 build.
+    assert("jq-linux-amd64".containsToken("amd64"));
+    assert("ffsend-linux-x64".containsToken("x64"));
+    assert(!"jq-linux64".containsToken("x64"));
+    assert("jq-linux64".containsToken("linux"));
+    assert("tool-x86_64".containsToken("x86_64"));
+
+    // A version token has to be a version all the way through; "pkcs11" is not.
+    assert(isVersionToken("1") && isVersionToken("v2") && isVersionToken("1.2.3"));
+    assert(!isVersionToken("pkcs11") && !isVersionToken("armv7") && !isVersionToken(""));
+}
+
+unittest
+{
+    scope (exit)
+        resetResolver();
+    setResolver(linuxAmd64());
+
+    // Foreign operating systems are recognised by name, and an asset that
+    // names none at all counts as usable here.
+    assert(hasForeignOs("Espanso-Win-Portable-x86_64.zip"));
+    assert(hasForeignOs("flawz-x86_64-apple-darwin.tar.xz"));
+    assert(!hasForeignOs("Espanso-X11.AppImage"));
+    assert(!hasForeignOs("mprober_x86_64"));
+    assert(allForeignOs(assetsNamed([
+        "flawz-x86_64-apple-darwin.tar.xz", "flawz-x86_64-pc-windows-msvc.zip"
+    ])));
+    assert(!allForeignOs(assetsNamed(["tool-linux-amd64", "tool-windows.zip"])));
+
+    // An AppImage is installable on Linux, so it has to be scoreable too.
+    assert(isSupportedExt("Espanso-X11.AppImage"));
+}
+
+unittest
+{
+    scope (exit)
+        resetResolver();
+    setResolver(linuxAmd64());
+
+    static struct Case
+    {
+        string repo;
+        string[] assets;
+        string expected;
+    }
+
+    // Real releases that the Go build either mis-picked or had to ask about.
+    const cases = [
+        // Picked the Windows zip because nothing penalised a foreign OS and
+        // the AppImage was excluded from scoring.
+        Case("espanso", [
+            "espanso-debian-wayland-amd64.deb", "espanso-debian-x11-amd64.deb",
+            "Espanso-Mac-Universal.dmg", "Espanso-Win-Installer-x86_64.exe",
+            "Espanso-Win-Portable-x86_64.zip", "Espanso-X11.AppImage"
+        ], "Espanso-X11.AppImage"),
+        // "linux64" contained the x64 alias, so it tied with the real amd64 build.
+        Case("jq", [
+            "jq-linux-amd64", "jq-linux64", "jq-linux-arm64", "jq-macos-amd64",
+            "jq-win64.exe", "sha256sum.txt"
+        ], "jq-linux-amd64"),
+        // The source archive scored level with the binary.
+        Case("hck", [
+            "hck-linux-amd64", "hck-linux-amd64-src.tar.gz",
+            "hck-linux-amd64.deb", "hck-macos-amd64", "hck-windows-amd64.exe"
+        ], "hck-linux-amd64"),
+        // Static and dynamic twins tied.
+        Case("ffsend", [
+            "ffsend-v0.2.77-linux-x64", "ffsend-v0.2.77-linux-x64-static"
+        ], "ffsend-v0.2.77-linux-x64-static"),
+        // "gcc" marks a glibc build, so it never grouped against the musl one.
+        Case("vopono", [
+            "vopono-gui_0.10.22_linux_x86-64_gcc", "vopono_0.10.22_amd64.deb",
+            "vopono_0.10.22_linux_aarch64", "vopono_0.10.22_linux_x86-64_gcc",
+            "vopono_0.10.22_linux_x86-64_musl"
+        ], "vopono_0.10.22_linux_x86-64_musl"),
+        // "pkcs11" was read as a version, ranking the plugin build level with
+        // the plain binary.
+        Case("restish", [
+            "restish-2.3.0-linux-amd64.tar.gz",
+            "restish-bulk-2.3.0-linux-amd64.tar.gz",
+            "restish-pkcs11-2.3.0-linux-amd64.tar.gz",
+            "restish-2.3.0-darwin-amd64.tar.gz", "restish-2.3.0-windows-amd64.zip"
+        ], "restish-2.3.0-linux-amd64.tar.gz"),
+        // Releases that already worked must keep working.
+        Case("bat", [
+            "bat-v0.26.1-x86_64-unknown-linux-musl.tar.gz",
+            "bat-v0.26.1-x86_64-unknown-linux-gnu.tar.gz",
+            "bat-v0.26.1-x86_64-apple-darwin.tar.gz",
+            "bat-v0.26.1-x86_64-pc-windows-msvc.zip", "bat_0.26.1_amd64.deb"
+        ], "bat-v0.26.1-x86_64-unknown-linux-musl.tar.gz"),
+        Case("syncthing", [
+            "syncthing-linux-amd64-v2.1.3.tar.gz",
+            "syncthing-linux-arm64-v2.1.3.tar.gz",
+            "syncthing-macos-universal-v2.1.3.zip",
+            "syncthing-windows-amd64-v2.1.3.zip"
+        ], "syncthing-linux-amd64-v2.1.3.tar.gz"),
+        Case("mprober", ["mprober_x86_64", "mprober_aarch64"], "mprober_x86_64"),
+    ];
+
+    foreach (testCase; cases)
+    {
+        string chosen;
+        string[] options;
+        preview(testCase.repo, testCase.assets, chosen, options);
+        assert(chosen == testCase.expected, testCase.repo ~ ": chose " ~ (chosen.length
+                ? chosen : "<prompt>") ~ ", want " ~ testCase.expected);
+    }
+
+    // A release with no build for this platform reports nothing at all rather
+    // than offering a macOS or Windows artefact.
+    string chosen;
+    string[] options;
+    preview("flawz", [
+        "flawz-aarch64-apple-darwin.tar.xz", "flawz-x86_64-apple-darwin.tar.xz",
+        "flawz-x86_64-pc-windows-msvc.zip", "flawz-x86_64-pc-windows-msvc.msi",
+        "flawz-installer.sh", "flawz-installer.ps1", "source.tar.gz"
+    ], chosen, options);
+    assert(chosen.length == 0 && options.length == 0);
 }
