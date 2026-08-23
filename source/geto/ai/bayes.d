@@ -1,7 +1,7 @@
 module geto.ai.bayes;
 
 import std.algorithm : maxElement;
-import std.json : JSONType, JSONValue, parseJSON;
+import std.json : JSONOptions, JSONType, JSONValue, parseJSON, toJSON;
 import std.math : exp, isNaN, log;
 
 /// The tiny non-zero probability used when a class has no training data.
@@ -167,7 +167,8 @@ final class Classifier
         root["learned"] = learnedCount;
         root["seen"] = seenCount;
         root["datas"] = JSONValue(classData);
-        return JSONValue(root).toString();
+        auto node = JSONValue(root);
+        return toJSON(node, false, JSONOptions.doNotEscapeSlashes);
     }
 
     /// Restores a model written by `toJson`. Throws on malformed input.

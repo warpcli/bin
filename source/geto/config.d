@@ -3,7 +3,7 @@ module geto.config;
 import std.algorithm : canFind;
 import std.array : array, split;
 import std.file : DirEntry, dirEntries, exists, isDir, mkdirRecurse, readText, rename, SpanMode, write;
-import std.json : JSONType, JSONValue, parseJSON, toJSON;
+import std.json : JSONOptions, JSONType, JSONValue, parseJSON, toJSON;
 import std.path : baseName, buildPath, dirName, extension, stripExtension;
 import std.process : environment;
 import std.string : endsWith, indexOf, startsWith, stripRight;
@@ -850,7 +850,7 @@ void writeAll()
 private void writeJsonFile(string path, JSONValue root)
 {
     mkdirRecurse(path.dirName);
-    write(path, toJSON(root, true) ~ "\n");
+    write(path, toJSON(root, true, JSONOptions.doNotEscapeSlashes) ~ "\n");
 }
 
 private void writeManifest(string manifestPath)

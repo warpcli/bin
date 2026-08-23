@@ -94,13 +94,24 @@ private bool defaultsToList(Command root, string[] args)
 {
     if (args.length == 0)
         return true;
-    foreach (child; root.children)
-        if (child.matches(args[0]))
-            return false;
-    foreach (reserved; ["-h", "--help", "-v", "--version", "help", "completion"])
-        if (args[0] == reserved)
-            return false;
-    return true;
+
+    // Resolution skips leading flags, so `geto -t all update` still finds
+    // `update` rather than being treated as a `list` filter.
+    string[] rest;
+    if (resolve(root, args, rest) !is root)
+        return false;
+
+    foreach (token; args)
+    {
+        if (token.length > 1 && token[0] == '-')
+            continue;
+        foreach (reserved; ["help", "completion"])
+            if (token == reserved)
+                return false;
+        return true;
+    }
+    // Only flags were given; let them apply to the root command.
+    return false;
 }
 
 /// Parses and runs the command line, returning the process exit code.

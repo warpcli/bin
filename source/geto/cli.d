@@ -178,7 +178,7 @@ final class Command
     }
 
     /// Flags declared here plus every ancestor's.
-    private Flag*[] visibleFlags()
+    package Flag*[] visibleFlags()
     {
         Flag*[] result;
         for (Command node = this; node !is null; node = node.parent)
@@ -207,20 +207,52 @@ final class Command
     }
 }
 
-/// Parses `args` against `root` and runs the resolved command.
-void execute(Command root, string[] args)
+/// Locates the command `args` names, returning the arguments left to parse.
+/// Flags may appear before the subcommand, so they are skipped while walking.
+Command resolve(Command root, string[] args, out string[] rest)
 {
     auto command = root;
-    string[] positional;
-    bool sawTerminator;
-
     size_t i = 0;
-    // Walk subcommands first so `geto tag add x` resolves before flags bind.
+
+    Flag* lookup(Command node, string token)
+    {
+        auto body_ = token.startsWith("--") ? token[2 .. $] : token[1 .. $];
+        const equals = body_.indexOfChar('=');
+        if (equals >= 0)
+            return null;
+        foreach (flag; node.visibleFlags())
+        {
+            if (token.startsWith("--") && flag.longName == body_)
+                return flag;
+            if (!token.startsWith("--") && flag.shortName.length > 0
+                && flag.shortName == body_)
+                return flag;
+        }
+        return null;
+    }
+
     while (i < args.length)
     {
         const token = args[i];
-        if (token.startsWith("-"))
+        if (token == "--")
             break;
+        if (token.length > 1 && token.startsWith("-"))
+        {
+            // A value-taking flag swallows the token after it.
+            auto flag = lookup(command, token);
+            if (flag !is null && flag.takesValue)
+            {
+                rest ~= args[i];
+                if (i + 1 < args.length)
+                    rest ~= args[i + 1];
+                i += 2;
+                continue;
+            }
+            rest ~= args[i];
+            i++;
+            continue;
+        }
+
         Command next;
         foreach (child; command.children)
             if (child.matches(token))
@@ -234,6 +266,18 @@ void execute(Command root, string[] args)
         i++;
     }
 
+    rest ~= args[i .. $];
+    return command;
+}
+
+/// Parses `args` against `root` and runs the resolved command.
+void execute(Command root, string[] args)
+{
+    string[] rest;
+    auto command = resolve(root, args, rest);
+
+    string[] positional;
+    bool sawTerminator;
     auto flags = command.visibleFlags();
 
     Flag* findLong(string name)
@@ -252,9 +296,9 @@ void execute(Command root, string[] args)
         return null;
     }
 
-    for (; i < args.length; i++)
+    for (size_t i = 0; i < rest.length; i++)
     {
-        auto token = args[i];
+        auto token = rest[i];
         if (sawTerminator || !token.startsWith("-") || token == "-")
         {
             positional ~= token;
@@ -292,9 +336,9 @@ void execute(Command root, string[] args)
 
         if (flag.takesValue && !hasValue)
         {
-            if (i + 1 >= args.length)
+            if (i + 1 >= rest.length)
                 throw new UsageException("flag needs a value: " ~ token);
-            value = args[++i];
+            value = rest[++i];
         }
         else if (!flag.takesValue && !hasValue)
             value = "true";
@@ -425,6 +469,17 @@ unittest
     execute(root, ["install", "--debug", "x"]);
     assert(verbose);
     assert(captured == ["x"]);
+
+    // Flags may precede the subcommand, as cobra allows.
+    tags = null;
+    captured = null;
+    execute(root, ["-t", "essential", "install", "y"]);
+    assert(captured == ["y"]);
+    assert(tags == ["essential"]);
+
+    string[] rest;
+    assert(resolve(root, ["--debug", "install", "z"], rest).name == "install");
+    assert(rest == ["--debug", "z"]);
 
     bool threw;
     try

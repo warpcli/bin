@@ -5,7 +5,7 @@ import std.array : array;
 import std.ascii : isAlphaNum, isDigit, isHexDigit;
 import std.conv : to;
 import std.file : exists, mkdirRecurse, readText, remove, rename, write;
-import std.json : JSONType, JSONValue, parseJSON;
+import std.json : JSONOptions, JSONType, JSONValue, parseJSON, toJSON;
 import std.math : isFinite, isNaN, sqrt;
 import std.path : buildPath;
 import std.random : Mt19937, uniform01;
@@ -230,7 +230,9 @@ final class Engine
         state["weights2"] = JSONValue(layer2.weights.dup);
 
         writeFileAtomic(buildPath(dir, classifierFile), classifier.toJson());
-        writeFileAtomic(buildPath(dir, stateFile), JSONValue(state).toString());
+        auto stateNode = JSONValue(state);
+        writeFileAtomic(buildPath(dir, stateFile),
+            toJSON(stateNode, false, JSONOptions.doNotEscapeSlashes));
     }
 
     /// Restores model state, throwing when it is absent or unusable.
