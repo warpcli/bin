@@ -27,6 +27,10 @@ Building needs [LDC](https://github.com/ldc-developers/ldc) and
 [dub](https://dub.pm), plus the OpenSSL, xz, bzip2, zstd and zlib development
 headers. The flake's dev shell (`nix develop`) provides all of them.
 
+> **Linux only.** The D rewrite builds on
+> [mochafizz](https://github.com/bresilla/mochafizz), which targets Linux, so
+> the Windows binaries the Go releases used to ship are no longer produced.
+
 On first run, `geto` picks a download directory from your `PATH` (e.g. `~/.local/bin`) and creates its config.
 
 ---
