@@ -54,15 +54,17 @@ Running `geto` with no arguments opens the **TUI** on a real terminal, and falls
 
 | Command | Aliases | What it does |
 | --- | --- | --- |
-| `install <url> [name\|path]` | `add`, `i` | Install a binary from a repo/URL |
-| `update [name…]` | `u` | Update binaries (default tier, or named ones) |
-| `ensure [name…]` | `e` | Reinstall anything missing or hash-mismatched |
-| `list` | `ls` | Print a table of managed binaries |
+| `install <url> [name\|path]` | `i`, `add` | Install a binary from a repo/URL |
+| `update [name…]` | `u`, `up`, `upgrade` | Update binaries (default tier, or named ones) |
+| `ensure [name…]` | `e`, `sync` | Reinstall anything missing or hash-mismatched |
+| `list` | `ls`, `l` | Print a table of managed binaries |
 | `remove <name…>` | `rm`, `uninstall`, `delete` | Delete the binary and forget it |
-| `prune` | | Forget entries whose files no longer exist |
+| `prune` | `clean`, `gc` | Forget entries whose files no longer exist |
 | `pin` / `unpin` <name…> | | Freeze / unfreeze a binary's version |
 | `tag …` | | Manage tags/tiers (see below) |
-| `describe [name…]` | | Fetch & store repository descriptions |
+| `describe [name…]` | `desc` | Fetch & store repository descriptions |
+| `apply <file.json>` | | Apply a declarative manifest (see NixOS / Home Manager) |
+| `ai` | | Inspect or reset the learned asset-selection model |
 
 Useful flags on `update`:
 
@@ -107,18 +109,24 @@ geto -t all describe          # fetch descriptions for everything missing one
 geto describe --force bat     # refetch even if already present
 ```
 
-For private/rate-limited repos, export a token first (see [Authentication](#authentication)).
+For private/rate-limited repos, export a token first (see [Environment](#environment)).
 
 ---
 
 ## TUI
 
-Run `geto` (no args) to open the interactive UI: a full-width list with two-line entries showing name, version + update status, repo, architecture, libc (musl/glibc/static), size, tags, and the repo description.
+Run `geto` (no args) to open the interactive UI: a full-width list whose
+entries take three lines each — name and version + update status, then repo,
+architecture, libc (musl/glibc/static), size and tags, then the repo
+description. The list pages to fit your terminal, with a dot per page at the
+bottom and a help line under it.
 
 | Key | Action |
 | --- | --- |
-| `↑`/`↓`, `j`/`k`, `g`/`G` | navigate |
-| `/` | fuzzy filter |
+| `↑`/`↓`, `j`/`k` | move the selection |
+| `←`/`→`, `h`/`l`, `pgup`/`pgdn` | previous / next page |
+| `g`/`G`, `home`/`end` | jump to start / end |
+| `/` | filter by name |
 | `u` | update selected |
 | `r` | check all for updates |
 | `p` | pin / unpin |
@@ -274,13 +282,27 @@ geto --tag all ensure
 
 ---
 
-## Authentication
+## Environment
 
-Set as needed in your environment:
+Tokens, set as needed:
 
 - `GITHUB_AUTH_TOKEN` or `GITHUB_TOKEN` — GitHub API (avoids the 60 req/hr unauthenticated limit)
+- `GITLAB_TOKEN`, or `GITLAB_TOKEN_<host>` for a self-hosted instance
 - `CODEBERG_TOKEN` — Codeberg
 - `GHES_BASE_URL`, `GHES_UPLOAD_URL`, `GHES_AUTH_TOKEN` — GitHub Enterprise
+
+Paths and behaviour:
+
+| Variable | Effect |
+| --- | --- |
+| `GETO_CONFIG_FILE` / `GETO_CONFIG_HOME` | where the manifest lives |
+| `GETO_STATE_FILE` / `GETO_STATE_HOME` | where per-machine state lives |
+| `GETO_DEFAULT_PATH` | install directory |
+| `GETO_NONINTERACTIVE` | fail instead of prompting when a choice is ambiguous |
+| `GETO_NO_AI` | turn off the learned tie-breaker |
+
+The same three paths are also available as `--config-file`, `--state-file` and
+`--default-path`.
 
 ---
 
@@ -311,6 +333,7 @@ never use it.
 | --- | --- |
 | `source/geto/config.d` | manifest + state files, migrations, tag handling |
 | `source/geto/assets.d` | release-asset scoring, filtering and unpacking |
+| `source/geto/archive.d` | tar reader, plus zip and the compression codecs |
 | `source/geto/providers/` | GitHub, GitLab, Codeberg, HashiCorp, `go install` |
 | `source/geto/ai/` | naive Bayes + neural net used to break selection ties |
 | `source/geto/elf.d` | ELF parsing and interpreter/RUNPATH patching |
