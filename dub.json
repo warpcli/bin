@@ -20,7 +20,7 @@
   "dependencies": {
     "mochafizz": {
       "repository": "git+https://github.com/bresilla/mochafizz",
-      "version": "a5ad7c149bfa7a5f9e98d44e1d79ab625ff6b289"
+      "version": "d4a2b9a491dcf325abc588ca6d833b0c2228f739"
     },
     "requests": "~>2.2.1",
     "squiz-box": "~>0.3.0"

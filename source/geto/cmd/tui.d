@@ -11,11 +11,15 @@ import std.process : Config, spawnProcess;
 import std.stdio : File, stdin, stdout;
 import std.string : strip, toLower;
 
-import mochafizz.ansi.color : Color;
+import mochafizz.ansi.color : Color, rgbColor;
 import mochafizz.ansi.width : stringWidth;
 import mochafizz.ansi.wrap : truncate;
-import mochafizz.bubbles.spinner : Spinner, SpinnerTickMsg, newSpinner, tickCmd, update, view;
-import mochafizz.bubbles.textinput : TextInput, newTextInput, setValue, update, value, view;
+import mochafizz.bubbles.paginator : Paginator, newPaginator, nextPage,
+    onLastPage, pkDots, previousPage, itemsOnPage, sliceBounds, totalPages;
+import mochafizz.bubbles.spinner : LineFrames, Spinner, SpinnerTickMsg,
+    newSpinner, tickCmd, update, view;
+import mochafizz.bubbles.textinput : TextInput, clear, newTextInput,
+    setValue, update, value, view;
 import mochafizz.style : Align, Style, aligned, background, bold, foreground,
     italic, newStyle, padding, render, width, withBorder;
 import mochafizz.tea.cmd : Batch, Cmd, Quit, Tick;
@@ -134,12 +138,57 @@ private final class BinRow
 }
 
 // ---------------------------------------------------------------------------
+// Key bindings
+// ---------------------------------------------------------------------------
+
+/// One key binding plus the text the help line shows for it.
+private struct Binding
+{
+    string[] keys;
+    string helpKey;
+    string helpDesc;
+    bool enabled = true;
+
+    bool matches(const ref KeyPressMsg press) const
+    {
+        foreach (name; keys)
+            if (press.key.matchString(name))
+                return true;
+        return false;
+    }
+}
+
+/// Palette for the list chrome. The Go build only restyled the title, so
+/// everything else keeps bubbles' own defaults and is reproduced here.
+private Color helpKeyColor;
+private Color helpDescColor;
+private Color helpSepColor;
+private Color statusBarColor;
+private Color statusEmptyColor;
+private Color activeDotColor;
+private Color inactiveDotColor;
+
+shared static this()
+{
+    helpKeyColor = rgbColor(0x626262);
+    helpDescColor = rgbColor(0x4A4A4A);
+    helpSepColor = rgbColor(0x3C3C3C);
+    statusBarColor = rgbColor(0x777777);
+    statusEmptyColor = rgbColor(0x5C5C5C);
+    activeDotColor = rgbColor(0x979797);
+    inactiveDotColor = rgbColor(0x3C3C3C);
+}
+
+// ---------------------------------------------------------------------------
 // Model
 // ---------------------------------------------------------------------------
 
 private enum editFields = [
     "URL", "Provider", "Tags (comma-separated)", "Description"
 ];
+
+/// Each row occupies three lines: name, metadata, description.
+private enum rowHeight = 3;
 
 private final class TuiModel : Model
 {
@@ -148,9 +197,9 @@ private final class TuiModel : Model
     private BinRow[] rows;
     private BinRow[] visible;
 
+    private Paginator pages;
+    /// Cursor position within the current page.
     private int cursor;
-    private int offset;
-    private int listHeight = 20;
     private int width = 80;
     private int height = 24;
 
@@ -162,7 +211,10 @@ private final class TuiModel : Model
     private ulong statusToken;
 
     private bool filtering;
-    private string filterText;
+    private bool filterApplied;
+    private TextInput filterInput;
+
+    private bool showFullHelp;
 
     private bool confirming;
     private string confirmTarget;
@@ -173,9 +225,49 @@ private final class TuiModel : Model
     private TextInput[] inputs;
     private size_t editFocus;
 
+    // Bindings, mirroring bubbles' list keymap plus geto's own actions.
+    private Binding bCursorUp = Binding(["up", "k"], "↑/k", "up");
+    private Binding bCursorDown = Binding(["down", "j"], "↓/j", "down");
+    private Binding bPrevPage = Binding(["left", "h", "pgup", "b"], "←/h/pgup", "prev page");
+    private Binding bNextPage = Binding(["right", "l", "pgdown", "f"], "→/l/pgdn", "next page");
+    private Binding bGoToStart = Binding(["home", "g"], "g/home", "go to start");
+    private Binding bGoToEnd = Binding(["end", "G"], "G/end", "go to end");
+    private Binding bFilter = Binding(["/"], "/", "filter");
+    private Binding bClearFilter = Binding(["esc"], "esc", "clear filter");
+    private Binding bAccept = Binding(["enter"], "enter", "apply filter");
+    private Binding bCancel = Binding(["esc"], "esc", "cancel");
+    private Binding bUpdate = Binding(["u"], "u", "update");
+    private Binding bCheck = Binding(["r"], "r", "check all");
+    private Binding bPin = Binding(["p"], "p", "pin");
+    private Binding bEdit = Binding(["e"], "e", "edit");
+    private Binding bForget = Binding(["m"], "m", "forget choice");
+    private Binding bOpen = Binding(["o"], "o", "open repo");
+    private Binding bRemove = Binding(["d", "x"], "d", "remove");
+    private Binding bTag = Binding(["t"], "t", "tag");
+    private Binding bQuit = Binding(["q"], "q", "quit");
+    private Binding bShowFullHelp = Binding(["?"], "?", "more");
+    private Binding bCloseFullHelp = Binding(["?"], "?", "close help");
+
     this()
     {
-        spinner = newSpinner();
+        import mochafizz.term.raw : getSize, isTerminal;
+
+        if (isTerminal(1))
+        {
+            const size = getSize(1);
+            if (size.width > 0 && size.height > 0)
+            {
+                width = size.width - 4;
+                height = size.height;
+            }
+        }
+        spinner = newSpinner(LineFrames);
+        filterInput = newTextInput();
+        // The prompt is drawn separately so it can be styled, as bubbles does.
+        filterInput.prompt = "";
+        filterInput.charLimit = 64;
+        pages = newPaginator(1);
+        pages.kind = pkDots;
         scopes = collectTagScopes();
         rebuildRows();
     }
@@ -243,45 +335,106 @@ private final class TuiModel : Model
 
     private void applyFilter()
     {
-        if (filterText.length == 0)
+        const needle = filterInput.value.strip.toLower;
+        if (needle.length == 0)
             visible = rows;
         else
         {
             BinRow[] matched;
-            const needle = filterText.toLower;
             foreach (row; rows)
                 if (row.filterValue.toLower.canFind(needle))
                     matched ~= row;
             visible = matched;
         }
-        clampCursor();
+        updatePagination();
     }
 
-    private void clampCursor()
+    /// The absolute index of the cursor across all pages.
+    private int index() const
     {
-        if (cursor >= cast(int) visible.length)
-            cursor = cast(int) visible.length - 1;
-        if (cursor < 0)
+        return pages.page * pages.perPage + cursor;
+    }
+
+    /// Recomputes items-per-page from the space the chrome leaves over.
+    private void updatePagination()
+    {
+        const previous = index();
+
+        // Count the chrome exactly, so the rows fill whatever is left.
+        pages.totalItems = cast(int) visible.length;
+
+        int available = height;
+        available -= 3; // app frame's two blank lines, plus one spare row so the
+        // help line never lands on the very last terminal row
+        available -= 2; // title bar, plus the blank line under it
+        available -= 2; // status bar, plus its blank line
+        available -= paginationHeight();
+        available -= 1 + helpLines(); // help, preceded by a blank line
+
+        pages.perPage = max(1, available / rowHeight);
+
+        const total = max(pages.totalPages(), 1);
+        pages.page = pages.perPage > 0 ? previous / pages.perPage : 0;
+        cursor = pages.perPage > 0 ? previous % pages.perPage : 0;
+        if (pages.page >= total)
+            pages.page = total - 1;
+        if (pages.page < 0)
+            pages.page = 0;
+
+        const onPage = pages.itemsOnPage(cast(int) visible.length);
+        if (cursor >= onPage)
+            cursor = max(onPage - 1, 0);
+    }
+
+    /// How many lines the help occupies.
+    private int helpLines() const
+    {
+        // The full help is as tall as its longest column.
+        return showFullHelp ? 10 : 1;
+    }
+
+    /// Empty when there is only one page, matching bubbles.
+    private int paginationHeight() const
+    {
+        // An absent paginator still contributes the blank line the sections
+        // are joined with, which is what bubbles' lipgloss.Height("") == 1 does.
+        return pages.totalPages() < 2 ? 1 : 2;
+    }
+
+    private void cursorUp()
+    {
+        cursor--;
+        if (cursor < 0 && pages.page == 0)
+        {
             cursor = 0;
-        const rowsPerScreen = max(rowsVisible(), 1);
-        if (cursor < offset)
-            offset = cursor;
-        if (cursor >= offset + rowsPerScreen)
-            offset = cursor - rowsPerScreen + 1;
-        if (offset < 0)
-            offset = 0;
+            return;
+        }
+        if (cursor >= 0)
+            return;
+        pages.previousPage();
+        cursor = pages.itemsOnPage(cast(int) visible.length) - 1;
     }
 
-    private int rowsVisible()
+    private void cursorDown()
     {
-        // Each row is three lines; the chrome is title, blank, status and help.
-        return max((listHeight - 4) / 3, 1);
+        const onPage = pages.itemsOnPage(cast(int) visible.length);
+        cursor++;
+        if (cursor < onPage)
+            return;
+        if (!pages.onLastPage())
+        {
+            pages.nextPage();
+            cursor = 0;
+            return;
+        }
+        cursor = max(onPage - 1, 0);
     }
 
     private BinRow selectedRow()
     {
-        if (cursor >= 0 && cursor < cast(int) visible.length)
-            return visible[cursor];
+        const at = index();
+        if (at >= 0 && at < cast(int) visible.length)
+            return visible[at];
         return null;
     }
 
@@ -324,12 +477,11 @@ private final class TuiModel : Model
         {
             if (size.width > 0 && size.height > 0)
             {
-                // The app frame is one line of vertical and two columns of
-                // horizontal padding on each side.
+                // The app frame costs two columns each side; its vertical cost
+                // is accounted for in updatePagination.
                 width = size.width - 4;
                 height = size.height;
-                listHeight = size.height - 2;
-                clampCursor();
+                updatePagination();
             }
             return ModelUpdate(this, null);
         }
@@ -357,10 +509,8 @@ private final class TuiModel : Model
             return handleKey(press);
 
         if (editing)
-        {
             foreach (ref input; inputs)
                 input.update(message);
-        }
         return ModelUpdate(this, null);
     }
 
@@ -432,8 +582,7 @@ private final class TuiModel : Model
 
     private ModelUpdate handleKey(KeyPressMsg press)
     {
-        const key = press.key;
-        if (key.matchString("ctrl+c"))
+        if (press.key.matchString("ctrl+c"))
             return ModelUpdate(this, () => Quit());
 
         if (editing)
@@ -443,60 +592,17 @@ private final class TuiModel : Model
         if (filtering)
             return handleFilterKey(press);
 
-        if (key.matchString("q"))
+        // geto's own actions are checked first, so `u` and `d` stay update and
+        // remove rather than the paging keys bubbles binds them to.
+        if (bQuit.matches(press))
             return ModelUpdate(this, () => Quit());
-        if (key.matchString("/"))
-        {
-            filtering = true;
-            filterText = "";
-            applyFilter();
-            return ModelUpdate(this, null);
-        }
-        if (key.matchString("up", "k"))
-        {
-            if (cursor > 0)
-                cursor--;
-            clampCursor();
-            return ModelUpdate(this, null);
-        }
-        if (key.matchString("down", "j"))
-        {
-            if (cursor < cast(int) visible.length - 1)
-                cursor++;
-            clampCursor();
-            return ModelUpdate(this, null);
-        }
-        if (key.matchString("home", "g"))
-        {
-            cursor = 0;
-            clampCursor();
-            return ModelUpdate(this, null);
-        }
-        if (key.matchString("end", "G"))
-        {
-            cursor = cast(int) visible.length - 1;
-            clampCursor();
-            return ModelUpdate(this, null);
-        }
-        if (key.matchString("pgup", "ctrl+u"))
-        {
-            cursor -= rowsVisible();
-            clampCursor();
-            return ModelUpdate(this, null);
-        }
-        if (key.matchString("pgdown", "ctrl+d"))
-        {
-            cursor += rowsVisible();
-            clampCursor();
-            return ModelUpdate(this, null);
-        }
-        if (key.matchString("t"))
+        if (bTag.matches(press))
         {
             scopeIndex = (scopeIndex + 1) % scopes.length;
             rebuildRows();
             return ModelUpdate(this, setStatus("tag: " ~ currentScope()));
         }
-        if (key.matchString("p"))
+        if (bPin.matches(press))
         {
             auto row = selectedRow();
             if (row is null)
@@ -506,13 +612,13 @@ private final class TuiModel : Model
             return ModelUpdate(this, setStatus((row.binary.pinned
                     ? "pinned " : "unpinned ") ~ row.path.baseName));
         }
-        if (key.matchString("e"))
+        if (bEdit.matches(press))
         {
             if (auto row = selectedRow())
                 startEdit(row);
             return ModelUpdate(this, null);
         }
-        if (key.matchString("m"))
+        if (bForget.matches(press))
         {
             auto row = selectedRow();
             if (row is null)
@@ -526,7 +632,7 @@ private final class TuiModel : Model
             row.note = okStyle.render("forgot choice");
             return ModelUpdate(this, setStatus("forgot saved choice for " ~ row.path.baseName));
         }
-        if (key.matchString("o"))
+        if (bOpen.matches(press))
         {
             auto row = selectedRow();
             if (row is null || row.binary.url.length == 0)
@@ -534,7 +640,7 @@ private final class TuiModel : Model
             openUrl(row.binary.url);
             return ModelUpdate(this, setStatus("opening " ~ repoShort(row.binary.url)));
         }
-        if (key.matchString("d", "x"))
+        if (bRemove.matches(press))
         {
             if (auto row = selectedRow())
             {
@@ -544,7 +650,7 @@ private final class TuiModel : Model
             }
             return ModelUpdate(this, null);
         }
-        if (key.matchString("r"))
+        if (bCheck.matches(press))
         {
             Cmd[] commands;
             foreach (row; rows)
@@ -560,7 +666,7 @@ private final class TuiModel : Model
             commands ~= setStatus(format("checking %d binaries…", rows.length));
             return ModelUpdate(this, Batch(commands));
         }
-        if (key.matchString("u"))
+        if (bUpdate.matches(press))
         {
             auto row = selectedRow();
             if (row is null)
@@ -575,37 +681,92 @@ private final class TuiModel : Model
                 setStatus("updating " ~ row.path.baseName ~ "…"),
             ]));
         }
+
+        // Everything else is list navigation.
+        if (bShowFullHelp.matches(press))
+        {
+            showFullHelp = !showFullHelp;
+            updatePagination();
+            return ModelUpdate(this, null);
+        }
+        if (bFilter.matches(press))
+        {
+            filtering = true;
+            filterInput.clear();
+            filterInput.focused = true;
+            applyFilter();
+            return ModelUpdate(this, null);
+        }
+        if (filterApplied && bClearFilter.matches(press))
+        {
+            filterApplied = false;
+            filterInput.clear();
+            applyFilter();
+            return ModelUpdate(this, null);
+        }
+        if (bCursorUp.matches(press))
+        {
+            cursorUp();
+            return ModelUpdate(this, null);
+        }
+        if (bCursorDown.matches(press))
+        {
+            cursorDown();
+            return ModelUpdate(this, null);
+        }
+        if (bPrevPage.matches(press))
+        {
+            pages.previousPage();
+            clampCursorToPage();
+            return ModelUpdate(this, null);
+        }
+        if (bNextPage.matches(press))
+        {
+            pages.nextPage();
+            clampCursorToPage();
+            return ModelUpdate(this, null);
+        }
+        if (bGoToStart.matches(press))
+        {
+            pages.page = 0;
+            cursor = 0;
+            return ModelUpdate(this, null);
+        }
+        if (bGoToEnd.matches(press))
+        {
+            pages.page = max(pages.totalPages() - 1, 0);
+            cursor = max(pages.itemsOnPage(cast(int) visible.length) - 1, 0);
+            return ModelUpdate(this, null);
+        }
         return ModelUpdate(this, null);
+    }
+
+    private void clampCursorToPage()
+    {
+        const onPage = pages.itemsOnPage(cast(int) visible.length);
+        if (cursor >= onPage)
+            cursor = max(onPage - 1, 0);
     }
 
     private ModelUpdate handleFilterKey(KeyPressMsg press)
     {
-        const key = press.key;
-        if (key.matchString("esc"))
+        if (bCancel.matches(press))
         {
             filtering = false;
-            filterText = "";
+            filterApplied = false;
+            filterInput.clear();
             applyFilter();
             return ModelUpdate(this, null);
         }
-        if (key.matchString("enter"))
+        if (bAccept.matches(press))
         {
             filtering = false;
-            return ModelUpdate(this, null);
-        }
-        if (key.matchString("backspace"))
-        {
-            if (filterText.length > 0)
-                filterText = filterText[0 .. $ - 1];
+            filterApplied = filterInput.value.strip.length > 0;
             applyFilter();
             return ModelUpdate(this, null);
         }
-        const text = key.keyToString();
-        if (text.length == 1 && text[0] >= 0x20 && text[0] < 0x7F)
-        {
-            filterText ~= text;
-            applyFilter();
-        }
+        filterInput.update(press);
+        applyFilter();
         return ModelUpdate(this, null);
     }
 
@@ -749,7 +910,7 @@ private final class TuiModel : Model
 
     override View view()
     {
-        auto base = renderApp();
+        auto base = frame(renderApp());
         string content = base;
         if (editing)
             content = overlay(dim(base), editDialog());
@@ -761,48 +922,221 @@ private final class TuiModel : Model
         return result;
     }
 
-    private string renderApp()
+    /// The app frame: one blank line above and below, two columns each side.
+    private static string frame(string content)
     {
         auto output = appender!string;
-        const pad = "  ";
-
-        output ~= pad ~ titleStyle.render("geto · " ~ currentScope()) ~ "\n\n";
-
-        const rowsPerScreen = rowsVisible();
-        const end = min(offset + rowsPerScreen, cast(int) visible.length);
-        foreach (index; offset .. end)
-            output ~= renderRow(index) ~ "\n";
-
-        for (int index = end - offset; index < rowsPerScreen; index++)
-            output ~= "\n";
-
-        output ~= pad ~ renderStatusBar() ~ "\n";
-        output ~= pad ~ mutedStyle.render("↑/↓ move · u update · r check all · p pin · e edit · m forget · o open · d remove · t tag · / filter · q quit");
+        output ~= "\n";
+        foreach (line; content.split("\n"))
+            output ~= "  " ~ line ~ "\n";
         return output.data;
     }
 
-    private string renderStatusBar()
+    /// Sections in bubbles' order: title, status bar, items, paginator, help.
+    private string renderApp()
     {
-        if (filtering)
-            return accentStyle.render("filter: ") ~ filterText ~ mutedStyle.render("▌");
-        if (statusMessage.length > 0)
-            return (spinning ? spinner.view() ~ " " : "") ~ statusMessage;
+        auto output = appender!string;
+        output ~= titleView() ~ "\n";
+        output ~= statusView() ~ "\n";
+        output ~= itemsView() ~ "\n";
+        output ~= paginationView() ~ "\n";
+        output ~= helpView();
+        return output.data;
+    }
 
-        const noun = visible.length == 1 ? "binary" : "binaries";
-        return mutedStyle.render(format("%d %s", visible.length, noun));
+    /// Title chip and status message, with the spinner parked on the right.
+    /// While filtering the filter input takes the title's place.
+    private string titleView()
+    {
+        string line;
+        if (filtering)
+            line = newStyle().foreground(colorOk).render("Filter: ") ~ filterInput.view();
+        else
+        {
+            line = titleStyle.render("geto · " ~ currentScope());
+            if (statusMessage.length > 0)
+                line ~= "  " ~ statusMessage;
+            line = clip(line, max(width - 2, 1));
+        }
+
+        if (spinning)
+        {
+            const spare = width - line.stringWidth() - 1;
+            if (spare > 0)
+                line ~= " ".replicate(spare) ~ mutedStyle.render(spinner.view());
+        }
+        // Padding(0, 0, 1, 2): two columns in, one blank line under.
+        return "  " ~ line ~ "\n";
+    }
+
+    /// Item count, plus the active filter and how many rows it hides.
+    private string statusView()
+    {
+        string status;
+        const shown = visible.length;
+        const noun = shown == 1 ? "binary" : "binaries";
+        const counted = format("%d %s", shown, noun);
+
+        if (filtering)
+            status = shown == 0 ? newStyle().foreground(statusEmptyColor)
+                .render("Nothing matched") : counted;
+        else if (rows.length == 0)
+            status = newStyle().foreground(statusEmptyColor).render("No binaries");
+        else
+        {
+            if (filterApplied)
+                status ~= "“" ~ clip(filterInput.value.strip, 10) ~ "” ";
+            status ~= counted;
+        }
+
+        const hidden = rows.length - shown;
+        if (hidden > 0)
+            status ~= newStyle().foreground(inactiveDotColor).render(" • ") ~ newStyle()
+                .foreground(inactiveDotColor).render(format("%d filtered", hidden));
+
+        return "  " ~ newStyle().foreground(statusBarColor).render(status) ~ "\n";
+    }
+
+    /// The current page's rows, padded so the chrome below never shifts.
+    private string itemsView()
+    {
+        if (visible.length == 0)
+        {
+            const message = filtering ? "" : newStyle().foreground(helpKeyColor)
+                .render("No binaries.");
+            auto filler = appender!string;
+            filler ~= "  " ~ message;
+            foreach (_; 0 .. pages.perPage * rowHeight - 1)
+                filler ~= "\n";
+            return filler.data;
+        }
+
+        const bounds = pages.sliceBounds(cast(int) visible.length);
+        auto output = appender!string;
+        foreach (i; bounds.lo .. bounds.hi)
+        {
+            output ~= renderRow(i);
+            if (i + 1 < bounds.hi)
+                output ~= "\n";
+        }
+
+        const onPage = pages.itemsOnPage(cast(int) visible.length);
+        if (onPage < pages.perPage)
+            foreach (_; 0 .. (pages.perPage - onPage) * rowHeight)
+                output ~= "\n";
+        return output.data;
+    }
+
+    /// Dots, one per page, hidden when everything fits on one page.
+    private string paginationView()
+    {
+        if (pages.totalPages() < 2)
+            return "";
+        string dots;
+        foreach (page; 0 .. pages.totalPages())
+            dots ~= page == pages.page ? newStyle().foreground(activeDotColor)
+                .render("•") : newStyle().foreground(inactiveDotColor).render("•");
+        // MarginTop(1) plus PaddingLeft(2).
+        return "\n  " ~ dots;
+    }
+
+    private string helpView()
+    {
+        return "\n  " ~ (showFullHelp ? fullHelpView() : shortHelpView());
+    }
+
+    /// One line of `key desc` pairs joined by dots, clipped to the width.
+    private string shortHelpView()
+    {
+        Binding[] bindings = [bCursorUp, bCursorDown];
+        if (filtering)
+        {
+            bindings ~= bCancel;
+            if (filterInput.value.strip.length > 0)
+                bindings ~= bAccept;
+        }
+        else
+        {
+            if (rows.length > 0)
+                bindings ~= bFilter;
+            if (filterApplied)
+                bindings ~= bClearFilter;
+            bindings ~= [
+                bUpdate, bCheck, bPin, bEdit, bForget, bOpen, bRemove, bTag, bQuit,
+                bShowFullHelp
+            ];
+        }
+
+        const separator = newStyle().foreground(helpSepColor).render(" • ");
+        auto output = appender!string;
+        int used;
+        foreach (i, binding; bindings)
+        {
+            const piece = (used > 0 ? separator : "") ~ newStyle().foreground(helpKeyColor)
+                .render(binding.helpKey) ~ " " ~ newStyle()
+                .foreground(helpDescColor).render(binding.helpDesc);
+            const pieceWidth = piece.stringWidth();
+            if (used + pieceWidth > width)
+            {
+                const tail = " " ~ newStyle().foreground(helpSepColor).render("…");
+                if (used + tail.stringWidth() < width)
+                    output ~= tail;
+                break;
+            }
+            used += pieceWidth;
+            output ~= piece;
+        }
+        return output.data;
+    }
+
+    /// Columns of bindings, laid out like bubbles' full help.
+    private string fullHelpView()
+    {
+        import mochafizz.uv.layout : joinHorizontal;
+
+        Binding[] listLevel = [bFilter];
+        // Clearing a filter is only offered once one is applied, as bubbles does.
+        if (filterApplied)
+            listLevel ~= bClearFilter;
+        listLevel ~= [
+            bUpdate, bCheck, bPin, bEdit, bForget, bOpen, bRemove, bTag
+        ];
+
+        Binding[][] groups = [
+            [bCursorUp, bCursorDown, bNextPage, bPrevPage, bGoToStart, bGoToEnd],
+            listLevel, [bQuit, bCloseFullHelp],
+        ];
+
+        string[] columns;
+        foreach (group; groups)
+        {
+            string[] keys, descriptions;
+            foreach (binding; group)
+            {
+                keys ~= newStyle().foreground(helpKeyColor).render(binding.helpKey);
+                descriptions ~= newStyle().foreground(helpDescColor).render(binding.helpDesc);
+            }
+            columns ~= joinHorizontal(keys.join("\n"), " ", descriptions.join("\n"));
+        }
+
+        string rendered;
+        foreach (i, column; columns)
+            rendered = i == 0 ? column : joinHorizontal(rendered, "    ", column);
+        // Indent the continuation lines to match the two-column padding.
+        return rendered.split("\n").join("\n  ");
     }
 
     /// Renders one three-line row: name, metadata, description.
-    private string renderRow(int index)
+    private string renderRow(int position)
     {
-        auto row = visible[index];
-        const selected = index == cursor;
+        auto row = visible[position];
+        const selected = position == index();
 
         // Alternating shades; the selected row sits closest to the accent.
         auto rowBackground = rowBg;
         if (selected)
             rowBackground = rowBgSelected;
-        else if (index % 2 == 1)
+        else if (position % 2 == 1)
             rowBackground = rowBgAlt;
 
         Style base()
@@ -904,7 +1238,6 @@ private final class TuiModel : Model
     }
 }
 
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
