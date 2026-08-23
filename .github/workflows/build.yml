@@ -6,20 +6,26 @@ on:
     branches:
       - '**'
 
-name: Go
+name: D
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    - name: Set up Go
-      id: go
-      uses: actions/setup-go@v5
-      with:
-        go-version-file: 'go.mod'
-        check-latest: true
-    - name: Vet
-      run: go vet ./...
-    - name: Test
-      run: go test ./...
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up D
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-latest
+
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y liblzma-dev libbz2-dev libzstd-dev zlib1g-dev libssl-dev
+
+      - name: Test
+        run: dub test --compiler=$DC
+
+      - name: Build
+        run: dub build --compiler=$DC --build=release

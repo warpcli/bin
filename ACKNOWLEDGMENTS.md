@@ -4,7 +4,7 @@
 **Marcos Lilljedahl** and its contributors.
 
 Marcos built the original, elegant foundation this project stands on — the
-provider abstraction (GitHub, GitLab, Codeberg, HashiCorp, Docker, `go install`),
+provider abstraction (GitHub, GitLab, Codeberg, HashiCorp, `go install`),
 the asset scoring/extraction logic, and the whole idea of managing standalone
 release binaries without a package manager. Enormous thanks for the years of
 work that made this possible. 🙏
@@ -14,7 +14,7 @@ descriptions, a Bubble Tea TUI, and a reworked CLI. It would not exist without
 the upstream project.
 
 - Upstream: https://github.com/marcosnils/bin
-- This fork: https://github.com/bresilla/geto
+- This fork: https://github.com/termworks/geto
 
 The original code is MIT licensed; this fork keeps the MIT license and preserves
 the original copyright alongside the fork's — see [LICENSE](./LICENSE).

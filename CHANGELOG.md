@@ -1,5 +1,61 @@
 # Changelog
 
+## [0.5.0] - 2026-08-23
+
+### <!-- 0 -->⛰️  Features
+
+- Port CLI framework, commands and interactive TUI
+- Port github, gitlab, codeberg, hashicorp and goinstall
+- Port release-asset selection and unpacking
+- Port styles, table, progress, prompts and overlay
+- Add squiz-box wrappers for tar, zip and codecs
+- Port bayes classifier, neural net and seed model
+- Port ELF parsing, patching and file-type detection
+- Port manifest and state handling to D
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Ignore extensionless checksum manifests
+- Prefer plain builds and recognise every architecture
+- Read PAX and GNU long-name tar entries
+- Reject foreign-OS builds and match aliases on token boundaries
+- Restore the paginator, status bar and help layout
+- Resolve subcommands when flags precede them
+
+### <!-- 3 -->📚 Documentation
+
+- Point the repository URL at termworks/geto
+- Correct the TUI, command and environment sections
+- Note the port is Linux only
+
+### <!-- 4 -->⚡ Performance
+
+- Read only the headers needed for binary metadata
+
+### <!-- 5 -->🎨 Styling
+
+- Format the tree with dfmt
+
+### <!-- 6 -->🧪 Testing
+
+- Port asset, config, tag and version test coverage
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Allow a build-only dry run without publishing
+- Release static amd64 and arm64 binaries
+- Replace the makefile and lockfiles with oslo recipes
+- Remove Go sources and update docs for the D port
+
+### Build
+
+- Update deps hash for the mochafizz bump
+- Pin mochafizz with the musl termios fix
+- Keep the nix dependency lock in step with dub
+- Strip dead code and symbols from release builds
+- Replace Go toolchain with dub, ldc and nix packaging
+- Scaffold dub project for D port
+
 ## [0.4.0] - 2026-08-07
 
 ### <!-- 3 -->📚 Documentation

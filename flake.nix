@@ -86,17 +86,21 @@
 
         devShells.default = pkgs.mkShell {
           packages = [
-            pkgs.go
-            pkgs.gopls
-            pkgs.gotools
-            pkgs.go-tools
-            pkgs.delve
-            pkgs.golangci-lint
-            pkgs.goreleaser
+            pkgs.ldc
+            pkgs.dub
+            pkgs.dtools
+            pkgs.dscanner
+            pkgs.serve-d
+            pkgs.dub-to-nix
             pkgs.git-cliff
             pkgs.clang
             pkgs.mold
             pkgs.pkg-config
+            pkgs.openssl
+            pkgs.xz
+            pkgs.bzip2
+            pkgs.zstd
+            pkgs.zlib
 
             nixGLAlias
             nixVulkanAlias
@@ -107,7 +111,15 @@
             nixglPkgs.nixVulkanNvidia
           ] ++ guiLibs;
 
-          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath guiLibs;
+          # `requests` dlopens libssl/libcrypto, and squiz-box links the
+          # compression libraries, so both must be on the loader path.
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (guiLibs ++ [
+            pkgs.openssl
+            pkgs.xz
+            pkgs.bzip2
+            pkgs.zstd
+            pkgs.zlib
+          ]);
           WGPU_VALIDATION = "0";
           WGPU_DEBUG = "0";
         };

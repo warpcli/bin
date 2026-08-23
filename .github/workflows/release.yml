@@ -7,15 +7,39 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release'
-        required: true
+        description: 'Tag to release. Leave empty to build and verify only.'
+        required: false
 
 permissions:
   contents: write
 
 jobs:
-  release:
-    runs-on: ubuntu-latest
+  # Release binaries are linked fully static against musl, so one file runs on
+  # any Linux. A glibc static link still asks for a loader, and the static
+  # archives for OpenSSL and the compression libraries are only packaged for
+  # musl — hence Alpine.
+  #
+  # Alpine is set up as a chroot rather than as `container:`, because the
+  # JavaScript actions (checkout, upload-artifact) run on glibc Node and cannot
+  # execute inside a musl container. This way they stay on the Ubuntu host and
+  # only the build runs in Alpine.
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # apk-tools-url has to be spelled out per architecture: the action
+          # defaults to the x86_64 bootstrap binary, which cannot run on the
+          # arm64 runner. Both hashes are the ones Alpine publishes for v2.14.10.
+          - runner: ubuntu-latest
+            arch: amd64
+            alpine_arch: x86_64
+            apk_tools_sha: 34bb1a96f0258982377a289392d4ea9f3f4b767a4bb5806b1b87179b79ad8a1c
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            alpine_arch: aarch64
+            apk_tools_sha: e471d35aa221d031abe9b6288aede12a8e9f1a398954e5a2e1d1bce1727b4ef4
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,54 +47,90 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.inputs.tag || github.ref }}
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - name: Set up Alpine
+        uses: jirutka/setup-alpine@v1
         with:
-          go-version-file: 'go.mod'
-          check-latest: true
+          branch: v3.21
+          arch: ${{ matrix.alpine_arch }}
+          # Each runner matches its target, so this stays a native build and no
+          # QEMU emulation is involved.
+          apk-tools-url: https://gitlab.alpinelinux.org/api/v4/projects/5/packages/generic/v2.14.10/${{ matrix.alpine_arch }}/apk.static#!sha256!${{ matrix.apk_tools_sha }}
+          packages: >
+            ldc dub gcc musl-dev git tar binutils
+            openssl-dev openssl-libs-static
+            xz-dev xz-static
+            bzip2-dev bzip2-static
+            zstd-dev zstd-static
+            zlib-dev zlib-static
 
-      - name: Build release binaries
+      - name: Build static binary
+        shell: alpine.sh {0}
         run: |
-          set -euo pipefail
-          VERSION="${{ github.event.inputs.tag || github.ref_name }}"
-          COMMIT="$(git rev-parse --short HEAD)"
-          DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          LDFLAGS="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE} -X main.builtBy=github-actions"
+          set -eu
+          git config --global --add safe.directory "$PWD"
+          dub upgrade
+          # requests ships a staticssl configuration that does not compile; see
+          # the script for the one missing OpenSSL binding it adds.
+          ./scripts/patch-requests-static.sh
+          dub build --compiler=ldc2 --build=release --config=static
 
+      - name: Verify it is really static
+        shell: alpine.sh {0}
+        run: |
+          set -eu
+          # `ldd` is not enough: it prints "statically linked" for a binary that
+          # still carries an INTERP and will not start. Ask the ELF instead.
+          if readelf -d geto | grep -q NEEDED; then
+            echo "::error::${{ matrix.arch }} is dynamically linked:"
+            readelf -d geto | grep NEEDED
+            exit 1
+          fi
+          if readelf -l geto | grep -q INTERP; then
+            echo "::error::${{ matrix.arch }} requests a dynamic loader"
+            exit 1
+          fi
+          echo "verified static: no NEEDED entries, no INTERP segment"
+          ./geto --version
+
+      - name: Check the tag matches the manifest
+        if: github.ref_type == 'tag' || github.event.inputs.tag != ''
+        run: |
+          set -eu
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          manifest="$(sed -n 's/^[[:space:]]\{0,3\}"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' dub.json | head -1)"
+          if [ "${tag#v}" != "$manifest" ]; then
+            echo "::error::tag $tag does not match dub.json version $manifest"
+            exit 1
+          fi
+          echo "tag $tag matches the manifest"
+
+      - name: Package
+        run: |
+          set -eu
           mkdir -p dist
-          targets="linux/amd64 linux/arm64 windows/amd64"
-          for t in $targets; do
-            # CGO_ENABLED=0 is what makes these binaries fully static: with cgo
-            # the net package links the host resolver and the result depends on
-            # the builder's libc. Verified below rather than assumed.
-            export GOOS="${t%/*}" GOARCH="${t#*/}" CGO_ENABLED=0
-            out="bin"; [ "$GOOS" = "windows" ] && out="bin.exe"
-            echo "building $GOOS/$GOARCH"
-            go build -trimpath -ldflags "$LDFLAGS" -o "$out" ./src
+          tar -czf "dist/geto_linux_${{ matrix.arch }}.tar.gz" geto
 
-            if [ "$GOOS" = "linux" ]; then
-              if readelf -d "$out" | grep -q NEEDED; then
-                echo "::error::$GOOS/$GOARCH is dynamically linked:"
-                readelf -d "$out" | grep NEEDED
-                exit 1
-              fi
-              if readelf -l "$out" | grep -q INTERP; then
-                echo "::error::$GOOS/$GOARCH requests a dynamic loader"
-                exit 1
-              fi
-              echo "  verified static: no NEEDED entries, no INTERP segment"
-            fi
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: geto_linux_${{ matrix.arch }}
+          path: dist/*
 
-            pkg="bin_${GOOS}_${GOARCH}"
-            if [ "$GOOS" = "windows" ]; then
-              zip -q "dist/${pkg}.zip" "$out"
-            else
-              tar -czf "dist/${pkg}.tar.gz" "$out"
-            fi
-            rm -f "$out"
-          done
-          ( cd dist && sha256sum * > SHA256SUMS )
-          ls -la dist
+  # Skipped when workflow_dispatch runs with no tag, which makes that a dry run:
+  # both architectures build and are checked, and nothing is published.
+  release:
+    needs: build
+    if: github.ref_type == 'tag' || github.event.inputs.tag != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS && ls -la
 
       - name: Publish release
         uses: softprops/action-gh-release@v2

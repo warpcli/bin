@@ -1,0 +1,80 @@
+{
+  "name": "geto",
+  "version": "0.5.0",
+  "description": "Effortless binary manager",
+  "license": "MIT",
+  "authors": [
+    "Trim Bresilla"
+  ],
+  "targetType": "executable",
+  "targetName": "geto",
+  "sourcePaths": [
+    "source"
+  ],
+  "importPaths": [
+    "source"
+  ],
+  "stringImportPaths": [
+    "source/geto/ai/seed",
+    "."
+  ],
+  "dependencies": {
+    "mochafizz": {
+      "repository": "git+https://github.com/bresilla/mochafizz",
+      "version": "79703c1059374d4b3640a0669db0912ad224d2d4"
+    },
+    "requests": "~>2.2.1",
+    "squiz-box": "~>0.3.0"
+  },
+  "configurations": [
+    {
+      "name": "application",
+      "targetType": "executable",
+      "mainSourceFile": "source/app.d"
+    },
+    {
+      "name": "static",
+      "targetType": "executable",
+      "mainSourceFile": "source/app.d",
+      "subConfigurations": {
+        "requests": "staticssl"
+      },
+      "dflags": [
+        "-static"
+      ]
+    }
+  ],
+  "buildTypes": {
+    "release": {
+      "buildOptions": [
+        "releaseMode",
+        "optimize",
+        "inline"
+      ],
+      "dflags-ldc": [
+        "--function-sections",
+        "--data-sections"
+      ],
+      "lflags-ldc": [
+        "--gc-sections",
+        "-s"
+      ]
+    },
+    "release-native": {
+      "buildOptions": [
+        "releaseMode",
+        "optimize",
+        "inline"
+      ],
+      "dflags-ldc": [
+        "--function-sections",
+        "--data-sections",
+        "-mcpu=native"
+      ],
+      "lflags-ldc": [
+        "--gc-sections",
+        "-s"
+      ]
+    }
+  }
+}

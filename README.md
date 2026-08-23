@@ -6,7 +6,7 @@
 
 Effortless binary manager. Install, update, and organize standalone binaries pulled straight from release pages — no package manager, no build step.
 
-`geto` downloads release assets from GitHub, GitLab, Codeberg, HashiCorp releases, Docker images, or `go install`, picks the right artifact for your OS/arch, unpacks it if needed, and keeps track of what's installed so you can update everything in one command.
+`geto` downloads release assets from GitHub, GitLab, Codeberg, HashiCorp releases, or `go install`, picks the right artifact for your OS/arch, unpacks it if needed, and keeps track of what's installed so you can update everything in one command.
 
 > A hard fork of [marcosnils/bin](https://github.com/marcosnils/bin) with a single tagged config, repo descriptions, and a full TUI.
 
@@ -14,17 +14,26 @@ Effortless binary manager. Install, update, and organize standalone binaries pul
 
 ## Install
 
-```sh
-go install github.com/bresilla/geto/src@latest
-```
-
+Grab a binary from the [releases page](https://github.com/termworks/geto/releases),
 or build from source:
 
 ```sh
-git clone https://github.com/bresilla/geto
+git clone https://github.com/termworks/geto
 cd geto
 make build      # produces ./geto
 ```
+
+`make` here is [oslo](https://github.com/bresilla/oslo)'s recipe runner reading
+`.make.lua`; outside an oslo shell it is `oslo make`. Plain
+`dub build --build=release` works just as well.
+
+Building needs [LDC](https://github.com/ldc-developers/ldc) and
+[dub](https://dub.pm), plus the OpenSSL, xz, bzip2, zstd and zlib development
+headers. The flake's dev shell (`nix develop`) provides all of them.
+
+> **Linux only.** The D rewrite builds on
+> [mochafizz](https://github.com/bresilla/mochafizz), which targets Linux, so
+> the Windows binaries the Go releases used to ship are no longer produced.
 
 On first run, `geto` picks a download directory from your `PATH` (e.g. `~/.local/bin`) and creates its config.
 
@@ -49,15 +58,17 @@ Running `geto` with no arguments opens the **TUI** on a real terminal, and falls
 
 | Command | Aliases | What it does |
 | --- | --- | --- |
-| `install <url> [name\|path]` | `add`, `i` | Install a binary from a repo/URL |
-| `update [name…]` | `u` | Update binaries (default tier, or named ones) |
-| `ensure [name…]` | `e` | Reinstall anything missing or hash-mismatched |
-| `list` | `ls` | Print a table of managed binaries |
+| `install <url> [name\|path]` | `i`, `add` | Install a binary from a repo/URL |
+| `update [name…]` | `u`, `up`, `upgrade` | Update binaries (default tier, or named ones) |
+| `ensure [name…]` | `e`, `sync` | Reinstall anything missing or hash-mismatched |
+| `list` | `ls`, `l` | Print a table of managed binaries |
 | `remove <name…>` | `rm`, `uninstall`, `delete` | Delete the binary and forget it |
-| `prune` | | Forget entries whose files no longer exist |
+| `prune` | `clean`, `gc` | Forget entries whose files no longer exist |
 | `pin` / `unpin` <name…> | | Freeze / unfreeze a binary's version |
 | `tag …` | | Manage tags/tiers (see below) |
-| `describe [name…]` | | Fetch & store repository descriptions |
+| `describe [name…]` | `desc` | Fetch & store repository descriptions |
+| `apply <file.json>` | | Apply a declarative manifest (see NixOS / Home Manager) |
+| `ai` | | Inspect or reset the learned asset-selection model |
 
 Useful flags on `update`:
 
@@ -102,18 +113,24 @@ geto -t all describe          # fetch descriptions for everything missing one
 geto describe --force bat     # refetch even if already present
 ```
 
-For private/rate-limited repos, export a token first (see [Authentication](#authentication)).
+For private/rate-limited repos, export a token first (see [Environment](#environment)).
 
 ---
 
 ## TUI
 
-Run `geto` (no args) to open the interactive UI: a full-width list with two-line entries showing name, version + update status, repo, architecture, libc (musl/glibc/static), size, tags, and the repo description.
+Run `geto` (no args) to open the interactive UI: a full-width list whose
+entries take three lines each — name and version + update status, then repo,
+architecture, libc (musl/glibc/static), size and tags, then the repo
+description. The list pages to fit your terminal, with a dot per page at the
+bottom and a help line under it.
 
 | Key | Action |
 | --- | --- |
-| `↑`/`↓`, `j`/`k`, `g`/`G` | navigate |
-| `/` | fuzzy filter |
+| `↑`/`↓`, `j`/`k` | move the selection |
+| `←`/`→`, `h`/`l`, `pgup`/`pgdn` | previous / next page |
+| `g`/`G`, `home`/`end` | jump to start / end |
+| `/` | filter by name |
 | `u` | update selected |
 | `r` | check all for updates |
 | `p` | pin / unpin |
@@ -164,10 +181,24 @@ writes `/var/lib/geto/config.state.json`, and installs into `/usr/local/bin`.
 | GitLab | `geto install gitlab.com/gitlab-org/cli` |
 | Codeberg | `geto install codeberg.org/lukeflo/bibiman` |
 | HashiCorp | `geto install releases.hashicorp.com/terraform` |
-| Docker | `geto install docker://hashicorp/terraform` |
 | `go install` | `geto install goinstall://github.com/x/y` |
 
-Asset selection scores candidates by OS/arch and filters out non-installable files (`.sig`, `.sha256`, `.sbom`, `.deb`, …). Your pick is remembered, so updates don't re-prompt unless the release's file layout changes (use `update -r` to force a re-pick).
+Asset selection scores candidates by OS/arch and filters out non-installable
+files (`.sig`, `.sha256`, `.sbom`, `.deb`, …), source archives and install
+scripts. Assets built for another operating system are dropped, and a release
+with no build for your platform fails with a clear message instead of offering
+a Windows or macOS artefact — pass `--all` to pick from everything anyway.
+Where a release ships twins, musl wins over glibc/gcc, static over dynamic,
+and the plain build over accelerator (`-rocm`, `-mlx`) or debug variants.
+Distribution packages and source archives never compete with the binary.
+
+When several assets still score identically, geto asks — and remembers the
+answer. A small naive-Bayes model over asset-name tokens, plus a nine-feature
+network, learns from those answers and resolves clear-cut ties on its own; see
+`geto ai`. Set `GETO_NO_AI=1` to turn it off.
+
+Your pick is remembered, so updates don't re-prompt unless the release's file
+layout changes (use `update -r` to force a re-pick).
 
 ---
 
@@ -181,7 +212,7 @@ repository descriptions.
 
 ```nix
 {
-  inputs.geto.url = "github:bresilla/geto";
+  inputs.geto.url = "github:termworks/geto";
 
   outputs = { nixpkgs, geto, ... }: {
     nixosConfigurations.host = nixpkgs.lib.nixosSystem {
@@ -255,27 +286,83 @@ geto --tag all ensure
 
 ---
 
-## Authentication
+## Environment
 
-Set as needed in your environment:
+Tokens, set as needed:
 
 - `GITHUB_AUTH_TOKEN` or `GITHUB_TOKEN` — GitHub API (avoids the 60 req/hr unauthenticated limit)
+- `GITLAB_TOKEN`, or `GITLAB_TOKEN_<host>` for a self-hosted instance
 - `CODEBERG_TOKEN` — Codeberg
 - `GHES_BASE_URL`, `GHES_UPLOAD_URL`, `GHES_AUTH_TOKEN` — GitHub Enterprise
+
+Paths and behaviour:
+
+| Variable | Effect |
+| --- | --- |
+| `GETO_CONFIG_FILE` / `GETO_CONFIG_HOME` | where the manifest lives |
+| `GETO_STATE_FILE` / `GETO_STATE_HOME` | where per-machine state lives |
+| `GETO_DEFAULT_PATH` | install directory |
+| `GETO_NONINTERACTIVE` | fail instead of prompting when a choice is ambiguous |
+| `GETO_NO_AI` | turn off the learned tie-breaker |
+
+The same three paths are also available as `--config-file`, `--state-file` and
+`--default-path`.
 
 ---
 
 ## Development
 
+`geto` is written in [D](https://dlang.org) and built with dub.
+
+Recipes live in `.make.lua`. At an [oslo](https://github.com/bresilla/oslo)
+prompt in this directory `make` is enough; everywhere else it is `oslo make`.
+
 ```sh
-make build      # build ./geto (version-stamped)
-make install    # install to $PREFIX/bin (default ~/.local/bin)
-make run ARGS='list -t all'
-make test       # go test ./...
-make verify     # fmt-check + vet + test
-make release TYPE=minor   # cut a release via git-rel
-make help       # list all targets
+make            # the recipes, with what each of them does
+make build      # the release binary
+make run list   # run it; bare words pass through, flags go in --args
+make test       # the suite
+make verify     # fmt-check + test + build
+make static     # fully static build (needs musl static libs — see below)
+make install    # into $PREFIX/bin (default ~/.local/bin)
+make release --type minor
 ```
+
+`build` uses the `release` build type: `-release -O3 -enable-inlining`, plus
+`--function-sections`/`--data-sections` with `--gc-sections` and `-s` to drop
+unreferenced code and symbols. `NATIVE=1 make build` adds `-mcpu=native`, which
+tunes for the building machine and is therefore not portable — releases never
+use it.
+
+### Layout
+
+| Path | What lives there |
+| --- | --- |
+| `source/geto/config.d` | manifest + state files, migrations, tag handling |
+| `source/geto/assets.d` | release-asset scoring, filtering and unpacking |
+| `source/geto/archive.d` | tar reader, plus zip and the compression codecs |
+| `source/geto/providers/` | GitHub, GitLab, Codeberg, HashiCorp, `go install` |
+| `source/geto/ai/` | naive Bayes + neural net used to break selection ties |
+| `source/geto/elf.d` | ELF parsing and interpreter/RUNPATH patching |
+| `source/geto/ui/` | palette, table, progress bar and prompts |
+| `source/geto/cmd/` | CLI commands and the interactive TUI |
+
+The TUI is built on [mochafizz](https://github.com/bresilla/mochafizz), pinned
+by commit in `dub.json` — which is the only manifest here. The version lives
+there too, and `source/app.d` reads it at compile time, so `geto --version`
+cannot drift from it.
+
+`nix build` fetches the dub dependencies through a fixed-output derivation, so
+moving any dependency means updating `outputHash` in `nix/package.nix` — build
+once, and Nix prints the hash it wanted.
+
+### Static builds
+
+Release binaries are linked fully static against musl, which needs static
+archives for OpenSSL and the compression libraries. Those are only packaged for
+musl, so `make static` and the release workflow run inside Alpine. See
+`scripts/patch-requests-static.sh` for the one upstream gap that has to be
+patched first.
 
 ## License & credits
 
